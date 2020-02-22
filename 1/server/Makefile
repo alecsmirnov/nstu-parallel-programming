@@ -16,16 +16,6 @@ server.o: server.c server.h list.h
 list.o: list.c list.h
 	gcc $(CFLAGS) -c list.c
 
-
-#server: server.o list.o
-#	gcc $(CFLAGS) -o server server.o list.o $(LIBS)
-
-#server.o: server.c list.h
-#	gcc $(CFLAGS) -c server.c 
-
-#list.o: list.c list.h
-#	gcc $(CFLAGS) -c list.c
-
 cleanTemp:
 	rm -rf *.o
 
