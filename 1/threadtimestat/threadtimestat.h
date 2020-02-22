@@ -3,7 +3,7 @@
 
 #include <time.h>
 
-#define FUNCTION_CALL_TIME 2.4E-9
+#define FUNCTION_CALL_TIME 8.0E-10
 #define BILLION            1.0E+9
 
 typedef double (*func_t)(double a, double b);

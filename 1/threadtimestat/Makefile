@@ -1,5 +1,5 @@
 DEFINES = -D_POSIX_C_SOURCE -D_BSD_SOURCE
-CFLAGS  = -std=c99 -O0 -static -g $(DEFINES)
+CFLAGS  = -std=c99 -O0 -g $(DEFINES)
 LIBS    = -lpthread
 
 all: threadtimestat cleanTemp

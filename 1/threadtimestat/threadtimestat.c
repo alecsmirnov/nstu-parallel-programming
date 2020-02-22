@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#include <float.h>
+
 #include "errorhandle.h"
 
 typedef struct ThreadArg {
@@ -19,10 +21,11 @@ typedef struct ThreadArg {
 static void* threadFunc(void* arg) {
 	ThreadArg* thread_arg = (ThreadArg*)arg;
 
-	struct timespec start, stop;
+	double res = 0;
+	
+	struct timespec start, stop; 
 	clock_gettime(CLOCK_REALTIME, &start);
 
-	double res = 0;
 	for (size_t i = 0; i != thread_arg->op_count; ++i)
 		res = thread_arg->op_func(thread_arg->a, thread_arg->b);
 

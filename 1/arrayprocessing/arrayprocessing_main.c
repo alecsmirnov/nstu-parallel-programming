@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <float.h>
 #include <time.h>
 
 #define ARGS_COUNT 6
@@ -35,16 +36,19 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 
 	fprintf(fp, "size\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
 
+	
 	for (uint32_t array_size = array_size_min; array_size < array_size_max; array_size *= 10) {
-		double* A_src = arrayInit(array_size);
+		double* A_src = arrayCreate(array_size);
 		double* A = arrayCreate(array_size);
+
+		arrayInit(A_src, array_size);
 
 		fprintf(fp, "%d:\t", array_size);
 
 		for (uint8_t i = 0; i != threads_count; ++i) {
 			arrayCopy(A, A_src, array_size);
 
-			double time_sum = 0;
+			double elapsed_time = DBL_MAX;
 			for (size_t j = 0; j != measure_count; ++j) {
 				struct timespec start, stop;
 				clock_gettime(CLOCK_REALTIME, &start);
@@ -53,10 +57,12 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 
 				clock_gettime(CLOCK_REALTIME, &stop);
 
-				time_sum += clocktimeDifference(start, stop);
+				double tmp_time = clocktimeDifference(start, stop);
+				if (tmp_time < elapsed_time)
+					elapsed_time = tmp_time;
 			}
 
-			fprintf(fp, "%lf\t", time_sum / measure_count);
+			fprintf(fp, "%lf\t", elapsed_time);
 
 		}
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <float.h>
 
 #include "errorhandle.h"
 #include "threadtimestat.h"
@@ -14,22 +15,26 @@ static double multOpFunc(double a, double b) {
 }
 
 static void resultOutput(FILE* fp, size_t measure_count, size_t op_start, size_t op_step, func_t op_func, double a, double b) {
-	ThreadStat avg_time = (ThreadStat){0, 0};
-
-	fprintf(fp, "Op count:\t Launch:\t Elapsed:\n");
+	fprintf(fp, "op count:\tlaunch time:\telapsed time:\n");
 
 	size_t op_count = op_start;
-	while (avg_time.elapsed_time <= avg_time.launch_time) {
+	ThreadStat min_time = (ThreadStat){DBL_MAX, DBL_MAX};
+	while (min_time.elapsed_time <= min_time.launch_time) {
+		min_time = (ThreadStat){DBL_MAX, DBL_MAX};
+
 		for (size_t j = 0; j != measure_count; ++j) {
 			ThreadStat thread_stat = threadTimeStat(op_func, op_count, a, b);
 
-			avg_time.launch_time += thread_stat.launch_time;
-			avg_time.elapsed_time += thread_stat.elapsed_time;
+			if (thread_stat.launch_time < min_time.launch_time)
+				min_time.launch_time = thread_stat.launch_time;
+
+			if (thread_stat.elapsed_time < min_time.elapsed_time)
+				min_time.elapsed_time = thread_stat.elapsed_time;
 		}
 
 		fprintf(fp, "%zu:\t", op_count);
-		fprintf(fp, "%.14lf\t", avg_time.launch_time / measure_count);
-		fprintf(fp, "%.14lf\n", avg_time.elapsed_time / measure_count);
+		fprintf(fp, "%.14lf\t", min_time.launch_time);
+		fprintf(fp, "%.14lf\n", min_time.elapsed_time);
 
 		op_count += op_step;
 	}
@@ -46,8 +51,8 @@ int main(int argc, char *argv[]) {
 	size_t op_start      = atoi(argv[2]);
 	size_t op_step       = atoi(argv[3]);
 
-	double a = 1;
-	double b = 2;
+	double a = 17;
+	double b = 3.13;
 
 	FILE* fp = fopen(RESULT_FILENAME, "w");
 
