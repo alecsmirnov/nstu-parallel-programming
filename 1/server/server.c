@@ -77,6 +77,8 @@ void serverStart(pthread_func thread_func, size_t stack_size, size_t clear_pull)
 	err = pthread_attr_setstacksize(&thread_attr, stack_size);
 	pthreadErrorHandle(err, PTHREAD_PASS, "Setting thread stack size failed");
 
+	pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+
 	List* threads_list = NULL;
 	listInit(&threads_list, sizeof(ThreadInfo), NULL);
 
