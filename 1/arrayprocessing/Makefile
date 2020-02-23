@@ -10,7 +10,7 @@ arrayprocessing: arrayprocessing_main.o arrayprocessing.o
 arrayprocessing_main.o: arrayprocessing_main.c arrayprocessing.h
 	gcc $(CFLAGS) -c arrayprocessing_main.c
 
-arrayprocessing.o: arrayprocessing.c arrayprocessing.h errorhandle.h
+arrayprocessing.o: arrayprocessing.c arrayprocessing.h
 	gcc $(CFLAGS) -c arrayprocessing.c
 
 cleanTemp:

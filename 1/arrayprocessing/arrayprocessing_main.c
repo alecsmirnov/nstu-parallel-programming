@@ -63,7 +63,6 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 			}
 
 			fprintf(fp, "%lf\t", elapsed_time);
-
 		}
 
 		fprintf(fp, "\n");
@@ -76,18 +75,18 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 int main(int argc, char* argv[]) {
 	if (argc != ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of arguments!\n");
-		fprintf(stderr, "Enter: <threads count> <array size min> <array size maxx> <func number> <measure count>\n");
+		fprintf(stderr, "Enter: <threads count> <array size min> <array size max> <func number> <measure count>\n");
 		fprintf(stderr, "(Func number: 0 - sqr, 1 - cube, 2 - revers)\n");
 		exit(EXIT_FAILURE);
 	}
 
 	srand(time(NULL));
 
-	uint8_t threads_count   = atoi(argv[1]);
+	uint8_t threads_count = atoi(argv[1]);
 	uint32_t array_size_min = atoi(argv[2]);
 	uint32_t array_size_max = atoi(argv[3]);
-	uint8_t func_num        = atoi(argv[4]);
-	size_t measure_count    = atoi(argv[5]);
+	uint8_t func_num = atoi(argv[4]);
+	size_t measure_count = atoi(argv[5]);
 
 	FILE* fp = fopen(RESULT_FILENAME, "w");
 

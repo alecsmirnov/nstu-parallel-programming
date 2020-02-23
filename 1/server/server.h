@@ -24,6 +24,6 @@ typedef struct ThreadParam {
 void clientWrite(int client_fd, char* response, size_t response_size);
 void clientClose(int client_fd);
 
-void serverStart(pthread_func thread_func, size_t stack_size);
+void serverStart(pthread_func thread_func, size_t stack_size, size_t clear_pull);
 
 #endif

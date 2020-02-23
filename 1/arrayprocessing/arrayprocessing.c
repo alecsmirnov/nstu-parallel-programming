@@ -1,8 +1,16 @@
 #include "arrayprocessing.h"
 
+#include <string.h>
 #include <pthread.h>
 
-#include "errorhandle.h"
+#define PTHREAD_PASS 0
+
+#define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
+	if (test_code != pass_code) {									\
+		fprintf(stderr, "%s%s\n", err_msg, strerror(test_code));	\
+		exit(EXIT_FAILURE);											\
+	}																\
+} while (0)
 
 typedef struct ThreadParam {
 	double* A;
@@ -16,6 +24,8 @@ static void* threadFunc(void* arg) {
 
 	for (uint32_t i = 0; i != thread_param->size; ++i)
 		thread_param->A[i] = thread_param->func(thread_param->A[i]);
+
+	pthread_exit(NULL);
 }
 
 void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func_ptr func) {
@@ -37,13 +47,13 @@ void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func
 		threads_param[i] = (ThreadParam){A + shift, part_size, func};
 
 		err = pthread_create(&threads[i], NULL, threadFunc, (void*)&threads_param[i]);
-		errorHandle(err, PASS_CODE, "Cannot create a thread: ");
+		pthreadErrorHandle(err, PTHREAD_PASS, "Cannot create a thread: ");
 	}
 
 	// Ожидаем завершения созданных потоков перед завершением работы программы
 	for (uint8_t i = 0; i != threads_count; ++i) {
 		err = pthread_join(threads[i], NULL);
-		errorHandle(err, PASS_CODE, "Cannot join a thread");
+		pthreadErrorHandle(err, PTHREAD_PASS, "Cannot join a thread");
 	}
 
 	free(threads);

@@ -10,7 +10,7 @@ threadtimestat: threadtimestat_main.o threadtimestat.o
 threadtimestat_main.o: threadtimestat_main.c threadtimestat.h
 	gcc $(CFLAGS) -c threadtimestat_main.c
 
-threadtimestat.o: threadtimestat.c threadtimestat.h errorhandle.h
+threadtimestat.o: threadtimestat.c threadtimestat.h
 	gcc $(CFLAGS) -c threadtimestat.c
 
 cleanTemp:

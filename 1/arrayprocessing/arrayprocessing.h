@@ -7,24 +7,26 @@
 
 typedef double (*func_ptr)(double);
 
-#define arrayCreate(array_size) \
-	(double*)malloc(sizeof(double) * array_size)
+static inline double* arrayCreate(uint32_t array_size) {
+	double* A = (double*)malloc(sizeof(double) * array_size);
+	return A;
+}
 
-#define arrayInit(A, array_size) do {			\
-	for (uint32_t i = 0; i != array_size; ++i)	\
-		A[i] = rand() % array_size;				\
-} while (0)
+static inline void arrayInit(double* A, uint32_t array_size) {
+	for (uint32_t i = 0; i != array_size; ++i)
+		A[i] = rand() % array_size;
+}
 
-#define arrayCopy(dest, src, array_size) do {	\
-	for (uint32_t i = 0; i != array_size; ++i)	\
-		dest[i] = src[i];						\
-} while (0)
+static inline void arrayCopy(double* dest, double* src, uint32_t array_size) {
+	for (uint32_t i = 0; i != array_size; ++i)
+		dest[i] = src[i];
+}
 
-arryPrint(fp, A, array_size) do {				\
-	for (uint32_t i = 0; i != array_size; ++i)	\
-		fprintf(fp, "%g ", A[i]);				\
-	fprintf(fp, "\n");							\
-} while (0)
+static inline void arryPrint(double* A, uint32_t array_size) {
+	for (uint32_t i = 0; i != array_size; ++i)
+		printf("%g ", A[i]);
+	printf("\n");
+}
 
 void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func_ptr func);
 

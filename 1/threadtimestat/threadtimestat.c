@@ -1,57 +1,34 @@
 #include "threadtimestat.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <pthread.h>
 
-#include <float.h>
+#define PTHREAD_PASS 0
 
-#include "errorhandle.h"
+#define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
+	if (test_code != pass_code) {									\
+		fprintf(stderr, "%s%s\n", err_msg, strerror(test_code));	\
+		exit(EXIT_FAILURE);											\
+	}																\
+} while (0)
 
-typedef struct ThreadArg {
-	double a;
-	double b;
-
-	func_t op_func;
-	size_t op_count;
-
-	double elapsed_time;
-} ThreadArg;
-
-static void* threadFunc(void* arg) {
-	ThreadArg* thread_arg = (ThreadArg*)arg;
-
-	double res = 0;
-	
-	struct timespec start, stop; 
-	clock_gettime(CLOCK_REALTIME, &start);
-
-	for (size_t i = 0; i != thread_arg->op_count; ++i)
-		res = thread_arg->op_func(thread_arg->a, thread_arg->b);
-
-	clock_gettime(CLOCK_REALTIME, &stop);
-	thread_arg->elapsed_time = clocktimeDifference(start, stop);
-
-	if (0 < thread_arg->op_count)
-		thread_arg->elapsed_time -= FUNCTION_CALL_TIME * thread_arg->op_count;
-
-	pthread_exit(NULL);
-}
-
-ThreadStat threadTimeStat(func_t op_func, size_t op_count, double a, double b) {
+ThreadStat threadTimeStat(size_t op_count) {
 	pthread_t thread_id;
-	ThreadArg thread_arg = (ThreadArg){a, b, op_func, op_count, 0.0};
+	ThreadArg thread_arg = (ThreadArg){op_count, 0.0};
 
 	struct timespec launch_start, launch_stop;
 	clock_gettime(CLOCK_REALTIME, &launch_start);
 
 	int err = pthread_create(&thread_id, NULL, threadFunc, (void*)&thread_arg);
-	errorHandle(err, PASS_CODE, "Thread create error");
+	pthreadErrorHandle(err, PTHREAD_PASS, "Thread create error");
 
 	clock_gettime(CLOCK_REALTIME, &launch_stop);
 
 	pthread_join(thread_id, NULL);
-	errorHandle(err, PASS_CODE, "Thread join error");
+	pthreadErrorHandle(err, PTHREAD_PASS, "Thread join error");
 
 	return (ThreadStat){clocktimeDifference(launch_start, launch_stop), thread_arg.elapsed_time};
 }
