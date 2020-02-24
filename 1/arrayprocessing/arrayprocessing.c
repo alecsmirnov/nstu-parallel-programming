@@ -3,8 +3,10 @@
 #include <string.h>
 #include <pthread.h>
 
+// Код прохождения обработки
 #define PTHREAD_PASS 0
 
+// Функция обработки ошибок
 #define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
 	if (test_code != pass_code) {									\
 		fprintf(stderr, "%s%s\n", err_msg, strerror(test_code));	\
@@ -12,11 +14,12 @@
 	}																\
 } while (0)
 
+// Параметры потока
 typedef struct ThreadParam {
-	double* A;
-	uint32_t size;
+	double* A;			// Указатель на массив
+	uint32_t size;		// Размер массива
 
-	func_ptr func;
+	func_ptr func;		// Функция обработки элемента
 } ThreadParam;
 
 static void* threadFunc(void* arg) {
@@ -28,11 +31,13 @@ static void* threadFunc(void* arg) {
 	pthread_exit(NULL);
 }
 
+// Обработка элементов массива
 void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func_ptr func) {
-	// Определяем переменные: информация о потоке (идентификатор потока и номер) и код ошибки
+	// Создаём необходимое количество потоков
 	pthread_t* threads = (pthread_t*)malloc(sizeof(pthread_t) * threads_count);
 	ThreadParam* threads_param = (ThreadParam*)malloc(sizeof(ThreadParam) * threads_count);
 
+	// Определяем размер чанков и остаток по размеру массива
 	int chunk_size = array_size / threads_count;
 	int remainder = array_size % threads_count;
 
@@ -44,6 +49,8 @@ void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func
 			++part_size;
 		}
 
+		// Записываем в параметр потока ту часть массива,
+		// которую он будет обрабатывать, и указатель на функцию обработки
 		threads_param[i] = (ThreadParam){A + shift, part_size, func};
 
 		err = pthread_create(&threads[i], NULL, threadFunc, (void*)&threads_param[i]);

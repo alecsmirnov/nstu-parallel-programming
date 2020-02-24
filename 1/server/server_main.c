@@ -5,13 +5,17 @@
 
 #include "server.h"
 
+// Количество аргументов командной строки
 #define ARGS_COUNT 4
 
+// Препроцессор для формирования строковых констант
 #define TEXT_QUOTE(...) #__VA_ARGS__
 
+// Количество цифр десятичного числа
 #define intDigitsCount(val)	\
 	((val) == 0 ? 1 : (size_t)floor(log10(abs(val))) + 1)
 
+// Шаблон для стандартной функции
 static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
 	HTTP/1.0 200 OK\r\n\r\n
 		<html>
@@ -29,6 +33,7 @@ static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
 	</html>\r\n
 );
 
+// Шаблон для возврата в версии PHP
 static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
 	HTTP/1.1 200 OK\r\n\r\n
 		<html>
@@ -47,6 +52,7 @@ static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
 	</html>\r\n
 );
 
+// Стандартная потоковая функция
 static void* threadFunc(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 
@@ -62,6 +68,7 @@ static void* threadFunc(void* arg) {
 	pthread_exit(NULL);
 }
 
+// Потоковая функция не прекращающая работу
 static void* threadFuncWait(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 
@@ -82,6 +89,7 @@ static void* threadFuncWait(void* arg) {
 	pthread_exit(NULL);	
 }
 
+// Потоковая функция с вызовом интерпретатора PHP и возвратом версии PHP
 static void* threadFuncPHP(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 

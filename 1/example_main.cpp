@@ -6,11 +6,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
+// Параметры потока
 struct ThreadParam {
-	std::uint8_t num;
-	std::string msg;
+	std::uint8_t num;	// Номер потока
+	std::string msg;	// Сообщение потока
 };
 
+// Функция отлова ошибок
 static void errorHandle(int test_code, int pass_code, std::string err_msg) {
 	if (test_code != pass_code) {
 		std::cerr << err_msg << std::strerror(test_code) << std::endl;
@@ -18,6 +20,7 @@ static void errorHandle(int test_code, int pass_code, std::string err_msg) {
 	}
 }
 
+// Вывод информации о созданном потоке
 static void displayThreadInfo() {
 	pthread_attr_t thread_attr;
 	int err = pthread_getattr_np(pthread_self(), &thread_attr);
@@ -70,6 +73,7 @@ static void* threadJob(void* arg) {
 	pthread_exit(NULL);
 }
 
+// Создание потоков
 void createThreads(std::uint8_t threads_count) {
 	// Определяем переменные: информация о потоке (идентификатор потока и номер) и код ошибки
 	std::vector<pthread_t> threads(threads_count);
