@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <pthread.h>
 
 // Код прохождения обработки
 #define PTHREAD_PASS 0
@@ -19,7 +18,7 @@
 
 // Функция получения времени запуска, времени выполнения потока,
 // при указанном количестве операций
-ThreadStat threadTimeStat(size_t op_count) {
+ThreadStat threadTimeStat(pthread_func thread_func, size_t op_count) {
 	pthread_t thread_id;
 	ThreadArg thread_arg = (ThreadArg){op_count, 0.0};
 
@@ -27,7 +26,7 @@ ThreadStat threadTimeStat(size_t op_count) {
 	struct timespec launch_start, launch_stop;
 	clock_gettime(CLOCK_REALTIME, &launch_start);
 
-	int err = pthread_create(&thread_id, NULL, threadFunc, (void*)&thread_arg);
+	int err = pthread_create(&thread_id, NULL, thread_func, (void*)&thread_arg);
 	pthreadErrorHandle(err, PTHREAD_PASS, "Thread create error");
 
 	clock_gettime(CLOCK_REALTIME, &launch_stop);

@@ -11,6 +11,25 @@
 // Выходной файл для результато тестирования
 #define RESULT_FILENAME "result.txt"
 
+static void* threadFunc(void* arg) {
+	ThreadArg* thread_arg = (ThreadArg*)arg;
+
+	double a = 17;
+	double b = 5.125013;
+
+	// Расчёт времени обработки указанного кол-ва операций умножения
+	struct timespec start, stop; 
+	clock_gettime(CLOCK_REALTIME, &start);
+
+	for (size_t i = 0; i != thread_arg->op_count; ++i)
+		a *= b;
+
+	clock_gettime(CLOCK_REALTIME, &stop);
+	thread_arg->elapsed_time = clocktimeDifference(start, stop);
+
+	pthread_exit(NULL);
+}
+
 // Функция поиска оптимального количества операций для порождения потока,
 // с выводом всех шагов поиска
 static void resultOutput(FILE* fp, size_t op_start, size_t op_step, size_t measure_count) {
@@ -25,7 +44,7 @@ static void resultOutput(FILE* fp, size_t op_start, size_t op_step, size_t measu
 		// Повторяем замеры указанное число раз и находим минимальное значение
 		// для каждой величины (исключаем посторонние процессы)
 		for (size_t j = 0; j != measure_count; ++j) {
-			ThreadStat thread_stat = threadTimeStat(op_count);
+			ThreadStat thread_stat = threadTimeStat(threadFunc, op_count);
 
 			if (thread_stat.launch_time < min_time.launch_time)
 				min_time.launch_time = thread_stat.launch_time;

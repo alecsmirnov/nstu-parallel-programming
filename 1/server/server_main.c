@@ -17,7 +17,8 @@
 
 // Шаблон для стандартной функции
 static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
-	HTTP/1.0 200 OK\r\n\r\n
+	HTTP/1.1 200 OK\r\n
+	Content-Length: %lu\r\n
 		<html>
 			<head>
 				<title>Request</title>
@@ -35,7 +36,8 @@ static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
 
 // Шаблон для возврата в версии PHP
 static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
-	HTTP/1.1 200 OK\r\n\r\n
+	HTTP/1.1 200 OK\r\n
+	Content-Length: %lu\r\n
 		<html>
 			<head>
 				<title>Request</title>
@@ -58,35 +60,13 @@ static void* threadFunc(void* arg) {
 
 	size_t response_size = strlen(RESPONSE_TEMPLATE) + intDigitsCount(thread_param->request_num);
 	char* response = (char*)malloc(sizeof(char) * response_size);
-
-	snprintf(response, response_size, RESPONSE_TEMPLATE, thread_param->request_num);
+	snprintf(response, response_size, RESPONSE_TEMPLATE, response_size, thread_param->request_num);
 
 	clientWrite(thread_param->client_fd, response, response_size);
-
 	clientClose(thread_param->client_fd);
+
 	free(response);
 	pthread_exit(NULL);
-}
-
-// Потоковая функция не прекращающая работу
-static void* threadFuncWait(void* arg) {
-	ThreadParam* thread_param = (ThreadParam*)arg;
-
-	size_t response_size = strlen(RESPONSE_TEMPLATE) + intDigitsCount(thread_param->request_num);
-	char* response = (char*)malloc(sizeof(char) * response_size);
-
-	snprintf(response, response_size, RESPONSE_TEMPLATE, thread_param->request_num);
-
-	clientWrite(thread_param->client_fd, response, response_size);
-
-	clientClose(thread_param->client_fd);
-	free(response);
-
-	while (true) {
-		sleep(1);
-	}
-
-	pthread_exit(NULL);	
 }
 
 // Потоковая функция с вызовом интерпретатора PHP и возвратом версии PHP
@@ -105,17 +85,29 @@ static void* threadFuncPHP(void* arg) {
 	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, thread_param->request_num, php_version);
 	
 	clientWrite(thread_param->client_fd, response, response_size);
-
 	clientClose(thread_param->client_fd);
+
 	free(response);
 	pthread_exit(NULL);
+}
+
+// Потоковая функция не прекращающая работу
+static void* threadFuncWait(void* arg) {
+	ThreadParam* thread_param = (ThreadParam*)arg;
+	clientClose(thread_param->client_fd);
+
+	while (true) {
+		sleep(1);
+	}
+
+	pthread_exit(NULL);	
 }
 
 int main(int argc, char* argv[]) {
 	if (argc < ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of arguments!\n");
 		fprintf(stderr, "Enter: <func num> <stack size num> <clear pull>\n");
-		fprintf(stderr, "(Func number: 0 - std, 1 - wait, 2 - php; Stack size num: 0 - 512 KB, 1 - 1 MB, 2 - 2 MB)\n");
+		fprintf(stderr, "(Func number: 0 - std, 1 - php, 2 - wait; Stack size num: 0 - 512 KB, 1 - 1 MB, 2 - 2 MB)\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -126,8 +118,8 @@ int main(int argc, char* argv[]) {
 	pthread_func thread_func = threadFunc;
 	switch (func_num) {
 		case 0: thread_func = threadFunc;     break;
-		case 1: thread_func = threadFuncWait; break;
-		case 2: thread_func = threadFuncPHP;  break;
+		case 1: thread_func = threadFuncPHP;  break;
+		case 2: thread_func = threadFuncWait; break;
 	}
 
 	size_t stack_size = 2 * MB;

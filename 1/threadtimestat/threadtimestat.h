@@ -10,6 +10,9 @@
 #define clocktimeDifference(start, stop) \
 	1.0 * (stop.tv_sec - start.tv_sec) + 1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
+// Указатель на потоковую функцию
+typedef void* (*pthread_func)(void*);
+
 // Статистика потока
 typedef struct ThreadStat {
 	double launch_time;		// Время запуска
@@ -25,27 +28,8 @@ typedef struct ThreadArg {
 	double elapsed_time;	// Время выполнения
 } ThreadArg;
 
-static void* threadFunc(void* arg) {
-	ThreadArg* thread_arg = (ThreadArg*)arg;
-
-	double a = 17;
-	double b = 5.125013;
-
-	// Расчёт времени обработки указанного кол-ва операций умножения
-	struct timespec start, stop; 
-	clock_gettime(CLOCK_REALTIME, &start);
-
-	for (size_t i = 0; i != thread_arg->op_count; ++i)
-		a *= b;
-
-	clock_gettime(CLOCK_REALTIME, &stop);
-	thread_arg->elapsed_time = clocktimeDifference(start, stop);
-
-	pthread_exit(NULL);
-}
-
 // Функция получения времени запуска, времени выполнения потока,
 // при указанном количестве операций
-ThreadStat threadTimeStat(size_t op_count);
+ThreadStat threadTimeStat(pthread_func thread_func, size_t op_count);
 
 #endif

@@ -71,7 +71,7 @@ void serverStart(pthread_func thread_func, size_t stack_size, size_t clear_pull)
 	setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
 
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(SERVER_PORT);
  
 	int err = bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
