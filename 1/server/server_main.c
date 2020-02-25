@@ -82,7 +82,7 @@ static void* threadFuncPHP(void* arg) {
 	fscanf(fp, "%s", php_version);
 	pclose(fp);
 
-	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, thread_param->request_num, php_version);
+	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, response_size, thread_param->request_num, php_version);
 	
 	clientWrite(thread_param->client_fd, response, response_size);
 	clientClose(thread_param->client_fd);
