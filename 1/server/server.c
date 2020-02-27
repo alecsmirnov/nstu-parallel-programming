@@ -56,6 +56,7 @@ void clientWrite(int client_fd, char* response, size_t response_size) {
 void clientClose(int client_fd) {
 	shutdown(client_fd, SHUT_WR);
 	recv(client_fd, NULL, 1, MSG_PEEK | MSG_DONTWAIT);
+	//recv(client_fd, NULL, 1, 0);
 	close(client_fd);
 }
 
@@ -89,6 +90,8 @@ void serverStart(pthread_func thread_func, size_t stack_size, size_t clear_pull)
 
 	err = pthread_attr_setstacksize(&thread_attr, stack_size);
 	pthreadErrorHandle(err, PTHREAD_PASS, "Setting thread stack size failed");
+
+	//pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
 
 	// Инициализация структуры для хранения данных о поступающих соединениях
 	List* threads_list = NULL;

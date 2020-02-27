@@ -64,11 +64,11 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 			double elapsed_time = DBL_MAX;
 			for (size_t j = 0; j != measure_count; ++j) {
 				struct timespec start, stop;
-				clock_gettime(CLOCK_REALTIME, &start);
+				clock_gettime(CLOCK_MONOTONIC, &start);
 
 				arrayProcessing(A, array_size, i + 1, array_func);
 
-				clock_gettime(CLOCK_REALTIME, &stop);
+				clock_gettime(CLOCK_MONOTONIC, &stop);
 
 				double tmp_time = clocktimeDifference(start, stop);
 				if (tmp_time < elapsed_time)

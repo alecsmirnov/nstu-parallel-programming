@@ -1,5 +1,5 @@
 DEFINES = -D_POSIX_C_SOURCE -D_BSD_SOURCE
-CFLAGS  = -std=c99 -g $(DEFINES)
+CFLAGS  = -std=c99 -02 -g $(DEFINES)
 LIBS    = -lpthread -lm
 
 all: server cleanTemp

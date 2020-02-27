@@ -24,12 +24,12 @@ ThreadStat threadTimeStat(pthread_func thread_func, size_t op_count) {
 
 	// Расчёт времени запуска потока
 	struct timespec launch_start, launch_stop;
-	clock_gettime(CLOCK_REALTIME, &launch_start);
+	clock_gettime(CLOCK_MONOTONIC, &launch_start);
 
 	int err = pthread_create(&thread_id, NULL, thread_func, (void*)&thread_arg);
 	pthreadErrorHandle(err, PTHREAD_PASS, "Thread create error");
 
-	clock_gettime(CLOCK_REALTIME, &launch_stop);
+	clock_gettime(CLOCK_MONOTONIC, &launch_stop);
 
 	pthread_join(thread_id, NULL);
 	pthreadErrorHandle(err, PTHREAD_PASS, "Thread join error");

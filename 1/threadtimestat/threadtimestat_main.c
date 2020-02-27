@@ -19,12 +19,12 @@ static void* threadFunc(void* arg) {
 
 	// Расчёт времени обработки указанного кол-ва операций умножения
 	struct timespec start, stop; 
-	clock_gettime(CLOCK_REALTIME, &start);
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	for (size_t i = 0; i != thread_arg->op_count; ++i)
 		a *= b;
 
-	clock_gettime(CLOCK_REALTIME, &stop);
+	clock_gettime(CLOCK_MONOTONIC, &stop);
 	thread_arg->elapsed_time = clocktimeDifference(start, stop);
 
 	pthread_exit(NULL);

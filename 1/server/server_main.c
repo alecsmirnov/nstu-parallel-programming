@@ -8,6 +8,8 @@
 // Количество аргументов командной строки
 #define ARGS_COUNT 4
 
+#define TIME_MINUTE 60
+
 // Препроцессор для формирования строковых констант
 #define TEXT_QUOTE(...) #__VA_ARGS__
 
@@ -17,7 +19,7 @@
 
 // Шаблон для стандартной функции
 static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
-	HTTP/1.1 200 OK\r\n
+	HTTP/1.0 200 OK\r\n
 	Content-Length: %lu\r\n
 		<html>
 			<head>
@@ -36,7 +38,7 @@ static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
 
 // Шаблон для возврата в версии PHP
 static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
-	HTTP/1.1 200 OK\r\n
+	HTTP/1.0 200 OK\r\n
 	Content-Length: %lu\r\n
 		<html>
 			<head>
@@ -82,7 +84,7 @@ static void* threadFuncPHP(void* arg) {
 	fscanf(fp, "%s", php_version);
 	pclose(fp);
 
-	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, response_size, thread_param->request_num, php_version);
+	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, thread_param->request_num, php_version);
 	
 	clientWrite(thread_param->client_fd, response, response_size);
 	clientClose(thread_param->client_fd);
@@ -96,9 +98,7 @@ static void* threadFuncWait(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 	clientClose(thread_param->client_fd);
 
-	while (true) {
-		sleep(1);
-	}
+	sleep(10 * TIME_MINUTE);
 
 	pthread_exit(NULL);	
 }
