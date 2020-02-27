@@ -19,8 +19,8 @@
 
 // Шаблон для стандартной функции
 static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
-	HTTP/1.0 200 OK\r\n
-	Content-Length: %lu\r\n
+	HTTP/1.1 200 OK\r\n
+	Content-Length: %lu\r\n\r\n
 		<html>
 			<head>
 				<title>Request</title>
@@ -38,8 +38,8 @@ static const char* RESPONSE_TEMPLATE = TEXT_QUOTE(
 
 // Шаблон для возврата в версии PHP
 static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
-	HTTP/1.0 200 OK\r\n
-	Content-Length: %lu\r\n
+	HTTP/1.1 200 OK\r\n
+	Content-Length: %lu\r\n\r\n
 		<html>
 			<head>
 				<title>Request</title>
@@ -76,20 +76,21 @@ static void* threadFuncPHP(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 
 	enum {PHP_VERSION_LEN = 20};
-	size_t response_size = strlen(RESPONSE_TEMPLATE_PHP) + intDigitsCount(thread_param->request_num) + PHP_VERSION_LEN;
-	char* response = (char*)malloc(sizeof(char) * response_size);
+	char php_version[PHP_VERSION_LEN];
 
 	FILE* fp = popen("php -r \"echo phpversion();\"", "r");
-	char php_version[PHP_VERSION_LEN];
-	fscanf(fp, "%s", php_version);
-	pclose(fp);
+	if (fscanf(fp, "%s", php_version) == 1) {
+		pclose(fp);
 
-	snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, thread_param->request_num, php_version);
-	
-	clientWrite(thread_param->client_fd, response, response_size);
+		size_t response_size = strlen(RESPONSE_TEMPLATE_PHP) + intDigitsCount(thread_param->request_num) + PHP_VERSION_LEN;
+		char* response = (char*)malloc(sizeof(char) * response_size);
+		snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, response_size, thread_param->request_num, php_version);
+		
+		clientWrite(thread_param->client_fd, response, response_size);
+		free(response);
+	}
+
 	clientClose(thread_param->client_fd);
-
-	free(response);
 	pthread_exit(NULL);
 }
 
