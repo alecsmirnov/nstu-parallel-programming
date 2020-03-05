@@ -15,40 +15,44 @@
 	}																\
 } while (0)
 
-struct CondQueue {
+typedef struct CondNode {
     bool* state;
-    
-    struct CondQueue* next;
+
+    struct CondNode* next;
+} CondNode;
+
+struct CondQueue {
+    struct CondNode* head;
+    struct CondNode* tail;
 };
 
-static void condQueuePush(CondQueue** queue, bool* state) {
-   CondQueue* new_node = (CondQueue*)malloc(sizeof(CondQueue));
-   
-   new_node->state = state;
-   new_node->next = *queue;
+static void condQueuePush(CondQueue* queue, bool* state) {
+    CondNode* new_node = (CondNode*)malloc(sizeof(CondNode));
 
-   *queue = new_node;
+    new_node->state = state;
+    new_node->next = NULL;
+
+    if (queue->head) {
+        queue->tail->next = new_node;
+        queue->tail = new_node;
+    }
+    else 
+        queue->head = queue->tail = new_node;
 }
 
-static bool* condQueuePop(CondQueue** queue) {
+static bool* condQueuePop(CondQueue* queue) {
     bool* state = NULL;
 
-    if (*queue) {
-        CondQueue* iter = *queue;
-        CondQueue* prev = NULL;
+    if (queue->head) {
+        state = queue->head->state;
+        CondNode* delete_node = queue->head;
 
-        while (iter->next) {
-            prev = iter;
-            iter = iter->next;
-        }
-
-        state = iter->state;
-        free(iter);
-
-        if (prev)
-            prev->next = NULL;
+        if (queue->head != queue->tail)
+            queue->head = queue->head->next;
         else
-            *queue = NULL;
+            queue->head = queue->tail = NULL;
+
+        free(delete_node);
     }
 
     return state;
