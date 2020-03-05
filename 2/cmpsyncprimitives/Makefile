@@ -3,7 +3,7 @@ CFLAGS  = -std=c99 -O2 -g $(DEFINES)
 LIBS    = -lpthread -lm
 TARGET  = cmpsyncprimitives
 
-all: $(TARGET) additionalLibCheck cleanTemp
+all: additionalLibCheck $(TARGET) cleanTemp
 
 additionalLibCheck:
 	@(test -f list.h || test -f list.c) || ( 										\

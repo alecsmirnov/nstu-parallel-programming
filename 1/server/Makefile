@@ -28,5 +28,3 @@ cleanTemp:
 
 clean:
 	rm -rf *.o server
-
-# list data structure from: https://github.com/alecsmirnov/doubly-linked-list
