@@ -3,6 +3,7 @@
 #include <float.h>
 
 #include "cmpsyncprimitives.h"
+#include "list.h"
 
 #define ARGS_COUNT 4 
 
@@ -12,6 +13,12 @@ typedef enum ResultType {
 	RT_AVG, 
 	RT_MIN
 } ResultType;
+
+List* int_list;
+
+void testFunc(size_t counter) {
+	listPopBack(int_list);
+}
 
 static void tableOutput(FILE* fp, ResultType result_type, size_t threads_count, size_t measure_count) {
 	double time_init = 0;
@@ -23,13 +30,20 @@ static void tableOutput(FILE* fp, ResultType result_type, size_t threads_count, 
 
 	fprintf(fp, "thrds:\tmutex:\tspin:\n");
 
+	listInit(&int_list, sizeof(size_t), NULL);
+
 	for (size_t i = 0; i != threads_count; ++i) {
 		double mutex_elapsed_time = time_init;
 		double spin_elapsed_time = time_init;
 
 		for (size_t j = 0; j != measure_count; ++j) {
-			double mutex_tmp = primitiveTimeStat(MUTEX, i + 1);
-			double spin_tmp = primitiveTimeStat(SPINLOCK, i + 1);
+    		for (size_t k = 0; k != LOCKS_COUNT; ++k) 
+    		    listPushBack(int_list, (void*)&k);
+			double mutex_tmp = primitiveTimeStat(testFunc, MUTEX, i + 1);
+
+			for (size_t k = 0; k != LOCKS_COUNT; ++k) 
+    		    listPushBack(int_list, (void*)&k);
+			double spin_tmp = primitiveTimeStat(testFunc, SPINLOCK, i + 1);
 
 			switch (result_type) {
 				case RT_AVG: {
@@ -54,6 +68,8 @@ static void tableOutput(FILE* fp, ResultType result_type, size_t threads_count, 
 
 		fprintf(fp, "%zu\t%lf\t%lf\n", i + 1, mutex_elapsed_time, spin_elapsed_time);
 	}
+
+	listFree(&int_list);
 }
 
 int main(int argc, char* argv[]) {

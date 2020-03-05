@@ -5,8 +5,6 @@
 #include <time.h>
 #include <pthread.h>
 
-#include "list.h"
-
 #define BILLION 1.0E+9
 
 #define PTHREAD_PASS 0
@@ -37,29 +35,30 @@ typedef struct PrimitiveType {
 typedef struct ThreadArg {
     primitive_func lock_func;
     primitive_func unlock_func;
+
     void* type;
 
-    List* int_list;
+    test_func func;
+    size_t counter;
 } ThreadArg;
 
 static void* threadFunc(void* arg) {
     ThreadArg* thread_arg = (ThreadArg*)arg;
 
-    while (!listIsEmpty(thread_arg->int_list)) {
+    while (thread_arg->counter < LOCKS_COUNT) {
         int err = thread_arg->lock_func(thread_arg->type);
-        pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock mutex");
+        pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock primitive");
 
-        size_t val = *(int*)listBack(thread_arg->int_list);
-        listPopBack(thread_arg->int_list);
+        thread_arg->func(thread_arg->counter++);
 
         err = thread_arg->unlock_func(thread_arg->type);
-        pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock mutex");
+        pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock primitive");
     }
 
     pthread_exit(NULL);
 }
 
-double primitiveTimeStat(SyncPrimitive primitive, uint8_t threads_count) {
+double primitiveTimeStat(test_func func, SyncPrimitive primitive, uint8_t threads_count) {
     PrimitiveType primitive_type;
 
     pthread_mutex_t mutex; 
@@ -94,11 +93,7 @@ double primitiveTimeStat(SyncPrimitive primitive, uint8_t threads_count) {
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot initialize primitive");
 
     pthread_t* threads = (pthread_t*)malloc(sizeof(pthread_t) * threads_count);
-    ThreadArg threads_arg = (ThreadArg){primitive_type.lock_func, primitive_type.unlock_func, primitive_type.type, NULL};
-
-    listInit(&threads_arg.int_list, sizeof(size_t), NULL);
-    for (size_t i = 0; i != LOCKS_COUNT; ++i) 
-        listPushBack(threads_arg.int_list, (void*)&i);
+    ThreadArg threads_arg = (ThreadArg){primitive_type.lock_func, primitive_type.unlock_func, primitive_type.type, func, 0};
 
     struct timespec start, stop;
 	clock_gettime(CLOCK_MONOTONIC, &start);

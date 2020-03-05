@@ -18,7 +18,7 @@ $(TARGET): $(TARGET)_main.o $(TARGET).o list.o
 $(TARGET)_main.o: $(TARGET)_main.c $(TARGET).h
 	gcc $(CFLAGS) -c $(TARGET)_main.c
 
-$(TARGET).o: $(TARGET).c $(TARGET).h list.h
+$(TARGET).o: $(TARGET).c $(TARGET).h
 	gcc $(CFLAGS) -c $(TARGET).c
 
 list.o: list.c list.h
