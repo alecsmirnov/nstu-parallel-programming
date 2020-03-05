@@ -1,17 +1,21 @@
 #ifndef CONDVARIMITATION_H
 #define CONDVARIMITATION_H
 
+#include <stdbool.h>
 #include <pthread.h>
 
-// list data structure from: https://github.com/alecsmirnov/doubly-linked-list
-#include "list.h"
+#define WAIT_TIME_MS 1e+6
 
-#define WAIT_TIME 1e+6
+typedef struct CondStateNode {
+    bool* state;
+
+    struct CondStateNode* next;
+} CondStateNode;
 
 typedef struct CondType {
     pthread_mutex_t mutex;
 
-    List* state_list;
+    struct CondStateNode* state_queue;
 } CondType;
 
 void pthreadCondInit(CondType* cond);

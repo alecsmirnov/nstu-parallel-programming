@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -15,22 +14,44 @@
 	}																\
 } while (0)
 
-#define signalToLock(list) do {             \
-    bool* lock = *(bool**)listFront(list);  \
-    *lock = false;                          \
-    listPopFront(list);                     \
-} while (0);
+static void stateQueuePush(CondStateNode** head, bool* state) {
+   CondStateNode* new_node = (CondStateNode*)malloc(sizeof(CondStateNode));
+   
+   new_node->state = state;
+   new_node->next = *head;
 
-static void StateListFree(void* arg) {
-    bool* lock = *(bool**)arg;
-    *lock = false;
+   *head = new_node;
+}
+
+static bool* stateQueuePop(CondStateNode** head) {
+    bool* state = NULL;
+
+    if (*head) {
+        CondStateNode* iter = *head;
+        CondStateNode* prev = NULL;
+
+        while (iter->next) {
+            prev = iter;
+            iter = iter->next;
+        }
+
+        state = iter->state;
+        free(iter);
+
+        if (prev)
+            prev->next = NULL;
+        else
+            *head = NULL;
+    }
+
+    return state;
 }
 
 void pthreadCondInit(CondType* cond) {
     int err = pthread_mutex_init(&cond->mutex, NULL);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot initialize mutex");
 
-    listInit(&cond->state_list, sizeof(bool**), StateListFree);
+    cond->state_queue = NULL;
 }
 
 void pthreadCondWait(CondType* cond, pthread_mutex_t* mutex) {
@@ -39,7 +60,7 @@ void pthreadCondWait(CondType* cond, pthread_mutex_t* mutex) {
 
     bool* lock = (bool*)malloc(sizeof(bool));
     *lock = true;
-    listPushBack(cond->state_list, &lock);
+    stateQueuePush(&cond->state_queue, lock);
 
     err = pthread_mutex_unlock(&cond->mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
@@ -48,7 +69,7 @@ void pthreadCondWait(CondType* cond, pthread_mutex_t* mutex) {
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock mutex");
 
     while (*lock)
-        usleep(WAIT_TIME);
+        usleep(WAIT_TIME_MS);
 
     err = pthread_mutex_lock(mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock mutex");
@@ -59,8 +80,9 @@ void pthreadCondSignal(CondType* cond) {
     int err = pthread_mutex_lock(&cond->mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock condition mutex");
 
-    if (!listIsEmpty(cond->state_list)) 
-        signalToLock(cond->state_list);
+    bool* lock = stateQueuePop(&cond->state_queue);
+    if (lock)
+        *lock = false;
 
     err = pthread_mutex_unlock(&cond->mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
@@ -70,8 +92,9 @@ void pthreadCondBroadcast(CondType* cond) {
     int err = pthread_mutex_lock(&cond->mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock condition mutex");
 
-    while (!listIsEmpty(cond->state_list)) 
-        signalToLock(cond->state_list);
+    bool* lock = NULL;
+    while ((lock = stateQueuePop(&cond->state_queue))) 
+        *lock = false;
 
     err = pthread_mutex_unlock(&cond->mutex);
     pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
@@ -79,5 +102,5 @@ void pthreadCondBroadcast(CondType* cond) {
 
 void pthreadCondDestroy(CondType* cond) {
     pthread_mutex_destroy(&cond->mutex);
-    listFree(&cond->state_list);
+    while (stateQueuePop(&cond->state_queue));
 }
