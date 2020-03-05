@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -14,8 +15,14 @@
 	}																\
 } while (0)
 
-static void stateQueuePush(CondStateNode** head, bool* state) {
-   CondStateNode* new_node = (CondStateNode*)malloc(sizeof(CondStateNode));
+struct CondQueue {
+    bool* state;
+
+    struct CondQueue* next;
+};
+
+static void stateQueuePush(CondQueue** head, bool* state) {
+   CondQueue* new_node = (CondQueue*)malloc(sizeof(CondQueue));
    
    new_node->state = state;
    new_node->next = *head;
@@ -23,12 +30,12 @@ static void stateQueuePush(CondStateNode** head, bool* state) {
    *head = new_node;
 }
 
-static bool* stateQueuePop(CondStateNode** head) {
+static bool* stateQueuePop(CondQueue** head) {
     bool* state = NULL;
 
     if (*head) {
-        CondStateNode* iter = *head;
-        CondStateNode* prev = NULL;
+        CondQueue* iter = *head;
+        CondQueue* prev = NULL;
 
         while (iter->next) {
             prev = iter;
