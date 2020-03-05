@@ -17,9 +17,9 @@ enum store_state {EMPTY, FULL} state = EMPTY;
 pthread_mutex_t mutex;
 
 #ifdef MYCONDVAR
-	CondType cond;
+CondType cond;
 #else
-	pthread_cond_t cond;
+pthread_cond_t cond;
 #endif
 
 void* producer(void *arg) {
@@ -33,11 +33,11 @@ void* producer(void *arg) {
 
 		while (state == FULL) {
 			#ifdef MYCONDVAR
-				pthreadCondWait(&cond, &mutex);
+			pthreadCondWait(&cond, &mutex);
 			#else
-				err = pthread_cond_wait(&cond, &mutex);
-				if (err != 0)
-					err_exit(err, "Cannot wait on condition variable");
+			err = pthread_cond_wait(&cond, &mutex);
+			if (err != 0)
+				err_exit(err, "Cannot wait on condition variable");
 			#endif
 		}
 
@@ -50,11 +50,11 @@ void* producer(void *arg) {
 
 		// Посылаем сигнал, что на складе появился товар.
 		#ifdef MYCONDVAR
-			pthreadCondSignal(&cond);
+		pthreadCondSignal(&cond);
 		#else
-			err = pthread_cond_signal(&cond);
-			if (err != 0)
-				err_exit(err, "Cannot send signal");
+		err = pthread_cond_signal(&cond);
+		if (err != 0)
+			err_exit(err, "Cannot send signal");
 		#endif
 
 		err = pthread_mutex_unlock(&mutex);
@@ -74,11 +74,11 @@ void* consumer(void* arg) {
 
 		while (state == EMPTY) {
 			#ifdef MYCONDVAR
-				pthreadCondWait(&cond, &mutex);
+			pthreadCondWait(&cond, &mutex);
 			#else
-				err = pthread_cond_wait(&cond, &mutex);
-				if (err != 0)
-					err_exit(err, "Cannot wait on condition variable");
+			err = pthread_cond_wait(&cond, &mutex);
+			if (err != 0)
+				err_exit(err, "Cannot wait on condition variable");
 			#endif
 		}
 
@@ -91,11 +91,11 @@ void* consumer(void* arg) {
 
 		// Посылаем сигнал, что на складе не осталось товаров.
 		#ifdef MYCONDVAR
-			pthreadCondSignal(&cond);
+		pthreadCondSignal(&cond);
 		#else
-			err = pthread_cond_signal(&cond);
-			if (err != 0)
-				err_exit(err, "Cannot send signal");
+		err = pthread_cond_signal(&cond);
+		if (err != 0)
+			err_exit(err, "Cannot send signal");
 		#endif
 
 		err = pthread_mutex_unlock(&mutex);
@@ -109,11 +109,11 @@ int main(int argc, char* argv[]) {
 	int err;
 
 	#ifdef MYCONDVAR
-		pthreadCondInit(&cond);
+	pthreadCondInit(&cond);
 	#else
-		err = pthread_cond_init(&cond, NULL); 
-		if (err != 0)
-			err_exit(err, "Cannot initialize condition variable");
+	err = pthread_cond_init(&cond, NULL); 
+	if (err != 0)
+		err_exit(err, "Cannot initialize condition variable");
 	#endif
 
 	err = pthread_mutex_init(&mutex, NULL);
@@ -136,9 +136,9 @@ int main(int argc, char* argv[]) {
 	// и условной переменной
 	pthread_mutex_destroy(&mutex);
 	#ifdef MYCONDVAR
-		pthreadCondDestroy(&cond);
+	pthreadCondDestroy(&cond);
 	#else
-		pthread_cond_destroy(&cond);
+	pthread_cond_destroy(&cond);
 	#endif
 
 	return 0;

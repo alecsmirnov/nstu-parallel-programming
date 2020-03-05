@@ -16,7 +16,7 @@ int task_list[TASKS_COUNT];
 int current_task = 0;
 
 #ifdef MUTEX
-    pthread_mutex_t mutex;
+pthread_mutex_t mutex;
 #endif
 
 void do_task(int task_no) {
@@ -30,11 +30,11 @@ void* thread_job(void* arg) {
     // Перебираем в цикле доступные задания
     while (true) {
         #ifdef MUTEX
-            // Захватываем мьютекс для исключительного доступа
-            // к указателю текущего задания (переменная current_task)
-            err = pthread_mutex_lock(&mutex);
-            if (err != 0)
-                err_exit(err, "Cannot lock mutex");
+        // Захватываем мьютекс для исключительного доступа
+        // к указателю текущего задания (переменная current_task)
+        err = pthread_mutex_lock(&mutex);
+        if (err != 0)
+            err_exit(err, "Cannot lock mutex");
         #endif
 
         // Запоминаем номер текущего задания, которое будем исполнять
@@ -45,10 +45,10 @@ void* thread_job(void* arg) {
         current_task++;
 
         #ifdef MUTEX
-            // Освобождаем мьютекс
-            err = pthread_mutex_unlock(&mutex);
-            if (err != 0)
-                err_exit(err, "Cannot unlock mutex");
+        // Освобождаем мьютекс
+        err = pthread_mutex_unlock(&mutex);
+        if (err != 0)
+            err_exit(err, "Cannot unlock mutex");
         #endif
 
         // Если запомненный номер задания не превышает
@@ -68,10 +68,10 @@ int main(int argc, char* argv[]) {
     int err;
 
     #ifdef MUTEX
-        // Инициализируем мьютекс
-        err = pthread_mutex_init(&mutex, NULL);
-        if (err != 0)
-            err_exit(err, "Cannot initialize mutex");
+    // Инициализируем мьютекс
+    err = pthread_mutex_init(&mutex, NULL);
+    if (err != 0)
+        err_exit(err, "Cannot initialize mutex");
     #endif
 
     // Создаём потоки
@@ -87,8 +87,8 @@ int main(int argc, char* argv[]) {
     pthread_join(thread2, NULL);
 
     #ifdef MUTEX
-        // Освобождаем ресурсы, связанные с мьютексом
-        pthread_mutex_destroy(&mutex);
+    // Освобождаем ресурсы, связанные с мьютексом
+    pthread_mutex_destroy(&mutex);
     #endif
 
     return 0;
