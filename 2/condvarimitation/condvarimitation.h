@@ -10,7 +10,7 @@ typedef struct CondQueue CondQueue;
 typedef struct CondType {
     pthread_mutex_t mutex;
 
-    struct CondQueue* state_queue;
+    struct CondQueue* queue;
 } CondType;
 
 void pthreadCondInit(CondType* cond);
