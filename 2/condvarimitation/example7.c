@@ -17,7 +17,7 @@ enum store_state {EMPTY, FULL} state = EMPTY;
 pthread_mutex_t mutex;
 
 #ifdef MYCONDVAR
-CondType cond;
+CondVar cond;
 #else
 pthread_cond_t cond;
 #endif
@@ -33,7 +33,7 @@ void* producer(void *arg) {
 
 		while (state == FULL) {
 			#ifdef MYCONDVAR
-			pthreadCondWait(&cond, &mutex);
+			condVarWait(&cond, &mutex);
 			#else
 			err = pthread_cond_wait(&cond, &mutex);
 			if (err != 0)
@@ -50,7 +50,7 @@ void* producer(void *arg) {
 
 		// Посылаем сигнал, что на складе появился товар.
 		#ifdef MYCONDVAR
-		pthreadCondSignal(&cond);
+		condVarSignal(&cond);
 		#else
 		err = pthread_cond_signal(&cond);
 		if (err != 0)
@@ -74,7 +74,7 @@ void* consumer(void* arg) {
 
 		while (state == EMPTY) {
 			#ifdef MYCONDVAR
-			pthreadCondWait(&cond, &mutex);
+			condVarWait(&cond, &mutex);
 			#else
 			err = pthread_cond_wait(&cond, &mutex);
 			if (err != 0)
@@ -91,7 +91,7 @@ void* consumer(void* arg) {
 
 		// Посылаем сигнал, что на складе не осталось товаров.
 		#ifdef MYCONDVAR
-		pthreadCondSignal(&cond);
+		condVarSignal(&cond);
 		#else
 		err = pthread_cond_signal(&cond);
 		if (err != 0)
@@ -109,7 +109,7 @@ int main(int argc, char* argv[]) {
 	int err;
 
 	#ifdef MYCONDVAR
-	pthreadCondInit(&cond);
+	condVarInit(&cond);
 	#else
 	err = pthread_cond_init(&cond, NULL); 
 	if (err != 0)
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
 	// и условной переменной
 	pthread_mutex_destroy(&mutex);
 	#ifdef MYCONDVAR
-	pthreadCondDestroy(&cond);
+	condVarDestroy(&cond);
 	#else
 	pthread_cond_destroy(&cond);
 	#endif

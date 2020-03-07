@@ -3,31 +3,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 #include <unistd.h>
 
-#define PTHREAD_PASS 0
-
-#define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
-	if (test_code != pass_code) {									\
-		fprintf(stderr, "%s: %s\n", err_msg, strerror(test_code));	\
-		exit(EXIT_FAILURE);											\
-	}																\
+// Функция обработки ошибок
+#define throwErr(msg) do {          \
+    fprintf(stderr, "%s\n", msg);   \
+    exit(EXIT_FAILURE);             \
 } while (0)
 
+// Узел очереди блокировок
+// (Состоянние заблокировванного потока)
 typedef struct CondNode {
     bool* state;
 
     struct CondNode* next;
 } CondNode;
 
+// Очередь блокировок
 struct CondQueue {
     struct CondNode* head;
     struct CondNode* tail;
 };
 
-static void condQueuePush(CondQueue* queue, bool* state) {
+// Добавление состояние поток в очередь блокировок
+static void condQueueSet(CondQueue* queue, bool* state) {
     CondNode* new_node = (CondNode*)malloc(sizeof(CondNode));
+    if (new_node == NULL)
+        throwErr("Error: new node out of memmory!");
 
     new_node->state = state;
     new_node->next = NULL;
@@ -40,7 +42,8 @@ static void condQueuePush(CondQueue* queue, bool* state) {
         queue->head = queue->tail = new_node;
 }
 
-static bool* condQueuePop(CondQueue* queue) {
+// Взятие состояние поток из очереди блокировок
+static bool* condQueueGet(CondQueue* queue) {
     bool* state = NULL;
 
     if (queue->head) {
@@ -58,60 +61,91 @@ static bool* condQueuePop(CondQueue* queue) {
     return state;
 }
 
-void pthreadCondInit(CondType* cond) {
+// Инициализация условной переменнной 
+void condVarInit(CondVar* cond) {
     int err = pthread_mutex_init(&cond->mutex, NULL);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot initialize mutex");
+    if (err != 0)
+        throwErr("Error: cannot initialize mutex!");
+
+    cond->queue = (CondQueue*)malloc(sizeof(CondQueue));
+    if (cond->queue == NULL)
+        throwErr("Error: condition queue out of memmory!");
 
     cond->queue = NULL;
 }
 
-void pthreadCondWait(CondType* cond, pthread_mutex_t* mutex) {
+// Блокировка до наступления события
+void condVarWait(CondVar* cond, pthread_mutex_t* mutex) {
+    // Блокируем условную переменную
     int err = pthread_mutex_lock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot lock condition mutex!");
 
+    // Сохраняем состояние потока
     bool* lock = (bool*)malloc(sizeof(bool));
     *lock = true;
-    condQueuePush(&cond->queue, lock);
+    condQueueSet(&cond->queue, lock);
 
+    // Освобождаем условную переменную
     err = pthread_mutex_unlock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot unlock condition mutex!");
 
+    // Освобождаем мьютекс до получения сигнала
     err = pthread_mutex_unlock(mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock mutex");
+    if (err != 0)
+        throwErr("Error: cannot unlock mutex!");
 
+    // Ждём пока не получен сигнал
     while (*lock)
         usleep(WAIT_TIME_MS);
     free(lock);
 
+    // Блокируем мьютекс после получения сигнала
     err = pthread_mutex_lock(mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock mutex");
+    if (err != 0)
+        throwErr("Error: cannot lock mutex!");
 }
 
-void pthreadCondSignal(CondType* cond) {
+// Сигнал для выхода из блокировки одного потока
+void condVarSignal(CondVar* cond) {
+    // Блокируем условную переменную
     int err = pthread_mutex_lock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot lock condition mutex!");
 
-    bool* lock = condQueuePop(&cond->queue);
+    // Посылаем сигнал хотя бы одному потоку
+    bool* lock = condQueueGet(&cond->queue);
     if (lock)
         *lock = false;
 
+    // Освобождаем условную переменную
     err = pthread_mutex_unlock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot unlock condition mutex!");
 }
 
-void pthreadCondBroadcast(CondType* cond) {
+// Сигнал для выхода из блокировки всех потоков
+void condVarBroadcast(CondVar* cond) {
+    // Блокируем условную переменную
     int err = pthread_mutex_lock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot lock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot lock condition mutex!");
 
+    // Посылаем сигнал всем потокам
     bool* lock = NULL;
-    while ((lock = condQueuePop(&cond->queue))) 
+    while ((lock = condQueueGet(&cond->queue))) 
         *lock = false;
 
+    // Освобождаем условную переменную
     err = pthread_mutex_unlock(&cond->mutex);
-    pthreadErrorHandle(err, PTHREAD_PASS, "Cannot unlock condition mutex");
+    if (err != 0)
+        throwErr("Error: cannot unlock condition mutex!");
 }
 
-void pthreadCondDestroy(CondType* cond) {
+// Уничтожение условной переменнной
+void condVarDestroy(CondVar* cond) {
     pthread_mutex_destroy(&cond->mutex);
-    while (condQueuePop(&cond->queue));
+    while (condQueueGet(&cond->queue));
+    free(cond->queue);
 }
