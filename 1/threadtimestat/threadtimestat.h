@@ -7,8 +7,9 @@
 #define BILLION 1.0E+9
 
 // Функция вычета разности между временными величинами
-#define clocktimeDifference(start, stop) \
-	1.0 * (stop.tv_sec - start.tv_sec) + 1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
+#define clocktimeDifference(start, stop) 			\
+	1.0 * (stop.tv_sec - start.tv_sec) + 			\
+	1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
 // Указатель на потоковую функцию
 typedef void* (*pthread_func)(void*);

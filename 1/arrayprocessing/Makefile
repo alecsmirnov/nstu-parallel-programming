@@ -1,20 +1,21 @@
 DEFINES = -D_POSIX_C_SOURCE -D_BSD_SOURCE
 CFLAGS  = -std=c99 -O2 -g $(DEFINES)
 LIBS    = -lpthread -lm
+TARGET  = arrayprocessing
 
-all: arrayprocessing cleanTemp
+all: $(TARGET) cleanTemp
 
-arrayprocessing: arrayprocessing_main.o arrayprocessing.o
-	gcc $(CFLAGS) -o arrayprocessing arrayprocessing_main.o arrayprocessing.o $(LIBS)
+$(TARGET): $(TARGET)_main.o $(TARGET).o
+	gcc $(CFLAGS) -o $(TARGET) $(TARGET)_main.o $(TARGET).o $(LIBS)
 
-arrayprocessing_main.o: arrayprocessing_main.c arrayprocessing.h
-	gcc $(CFLAGS) -c arrayprocessing_main.c
+$(TARGET)_main.o: $(TARGET)_main.c $(TARGET).h
+	gcc $(CFLAGS) -c $(TARGET)_main.c
 
-arrayprocessing.o: arrayprocessing.c arrayprocessing.h
-	gcc $(CFLAGS) -c arrayprocessing.c
+$(TARGET).o: $(TARGET).c $(TARGET).h
+	gcc $(CFLAGS) -c $(TARGET).c
 
 cleanTemp:
 	rm -rf *.o
 
 clean:
-	rm -rf arrayprocessing
+	rm -rf $(TARGET)

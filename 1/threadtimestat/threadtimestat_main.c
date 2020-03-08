@@ -65,7 +65,8 @@ static void resultOutput(FILE* fp, size_t op_start, size_t op_step, size_t measu
 int main(int argc, char *argv[]) {
 	if (argc < ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of aguments!\n");
-		fprintf(stderr, "Enter: <start operation count> <step operation count> <measure count>\n");
+		fprintf(stderr, "Enter: <start operation count> "
+						"<step operation count> <measure count>\n");
 		exit(EXIT_FAILURE);
 	}
 

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <signal.h>
 
-// Количество аргументов командной строки
 #define ARGS_COUNT 2
 
 // Шаблон команды для отправки HTTP запроса
@@ -31,6 +30,10 @@ int main(int argc, char* argv[]) {
 	// Формирование команды
 	size_t command_len = strlen(COMMAND_TEMPLATE) + strlen(argv[1]) + 1;
 	char* command = (char*)malloc(sizeof(char*) * command_len);
+	if (command == NULL) {
+		fprintf(stderr, "Error: out of memmory!\n");
+		exit(EXIT_FAILURE);
+	}
 
 	snprintf(command, command_len, COMMAND_TEMPLATE, argv[1]);	
 

@@ -2,20 +2,18 @@
 
 #include <stdio.h>
 #include <math.h>
-#include <float.h>
 #include <time.h>
 
-// Количество аргументов командной строки
 #define ARGS_COUNT 6
 
-// Выходной файл для результато тестирования
 #define RESULT_FILENAME "result.txt"
 
 #define BILLION 1.0E+9
 
 // Функция вычета разности между временными величинами
-#define clocktimeDifference(start, stop) \
-	1.0 * (stop.tv_sec - start.tv_sec) + 1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
+#define clocktimeDifference(start, stop) 			\
+	1.0 * (stop.tv_sec - start.tv_sec) + 			\
+	1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
 // Функции обработки элементов массива
 static double sqrFunc(double val) {
@@ -30,8 +28,11 @@ static double revFunc(double val) {
 	return 1 / val;
 }
 
-// Функция расчёта времени обработки элементов массива на указанном количестве потоков, с указанным начальным и конечным размером массива
-static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_min, uint32_t array_size_max, uint8_t func_num, size_t measure_count) {
+// Функция расчёта времени обработки элементов массива на указанном количестве потоков,
+// с указанным начальным и конечным размером массива
+static void resultOutput(FILE* fp, uint8_t threads_count, 
+						 uint32_t array_size_min, uint32_t array_size_max, 
+						 uint8_t func_num, size_t measure_count) {
 	// Определение функции обработки элемента массива
 	func_ptr array_func = sqrFunc;
 	switch (func_num) {
@@ -51,7 +52,7 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 		double* A = arrayCreate(array_size);
 
 		// Инициализация исходного массива
-		arrayInit(A_src, array_size);
+		arrayRandInit(A_src, array_size);
 
 		fprintf(fp, "%d:\t", array_size);
 
@@ -59,23 +60,20 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 			// Копирование данных из исходного массива в массив обработки
 			arrayCopy(A, A_src, array_size);
 
-			// Повторяем замеры указанное число раз и находим минимальное время обработки массива
-			// (исключая посторонние процессы)
-			double elapsed_time = DBL_MAX;
+			// Повторяем замеры указанное число раз
+			double elapsed_time = 0;
 			for (size_t j = 0; j != measure_count; ++j) {
 				struct timespec start, stop;
 				clock_gettime(CLOCK_MONOTONIC, &start);
 
-				arrayProcessing(A, array_size, i + 1, array_func);
+				arrayProcessing(A, array_size, array_func, i + 1);
 
 				clock_gettime(CLOCK_MONOTONIC, &stop);
 
-				double tmp_time = clocktimeDifference(start, stop);
-				if (tmp_time < elapsed_time)
-					elapsed_time = tmp_time;
+				elapsed_time += clocktimeDifference(start, stop);
 			}
 
-			fprintf(fp, "%lf\t", elapsed_time);
+			fprintf(fp, "%lf\t", elapsed_time / measure_count);
 		}
 
 		fprintf(fp, "\n");
@@ -86,9 +84,10 @@ static void resultOutput(FILE* fp, uint8_t threads_count, uint32_t array_size_mi
 }
 
 int main(int argc, char* argv[]) {
-	if (argc != ARGS_COUNT) {
+	if (argc < ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of arguments!\n");
-		fprintf(stderr, "Enter: <threads count> <array size min> <array size max> <func number> <measure count>\n");
+		fprintf(stderr, "Enter: <threads count> <array size min> "
+						"<array size max> <func number> <measure count>\n");
 		fprintf(stderr, "(Func number: 0 - sqr, 1 - cube, 2 - revers)\n");
 		exit(EXIT_FAILURE);
 	}
@@ -104,7 +103,8 @@ int main(int argc, char* argv[]) {
 	FILE* fp = fopen(RESULT_FILENAME, "w");
 
 	printf("Program execution...\n");
-	resultOutput(fp, threads_count, array_size_min, array_size_max, func_num, measure_count);
+	resultOutput(fp, threads_count, array_size_min, 
+				 array_size_max, func_num, measure_count);
 	printf("Done.\n");
 
 	fclose(fp);

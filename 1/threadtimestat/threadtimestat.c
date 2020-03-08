@@ -5,34 +5,33 @@
 #include <stdint.h>
 #include <string.h>
 
-// Код прохождения обработки
-#define PTHREAD_PASS 0
-
 // Функция обработки ошибок
-#define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
-	if (test_code != pass_code) {									\
-		fprintf(stderr, "%s: %s\n", err_msg, strerror(test_code));	\
-		exit(EXIT_FAILURE);											\
-	}																\
+#define throwErr(msg) do {          \
+    fprintf(stderr, "%s\n", msg);   \
+    exit(EXIT_FAILURE);             \
 } while (0)
 
 // Функция получения времени запуска, времени выполнения потока,
 // при указанном количестве операций
 ThreadStat threadTimeStat(pthread_func thread_func, size_t op_count) {
-	pthread_t thread_id;
+	pthread_t thread;
 	ThreadArg thread_arg = (ThreadArg){op_count, 0.0};
+	int err = 0;
 
 	// Расчёт времени запуска потока
 	struct timespec launch_start, launch_stop;
 	clock_gettime(CLOCK_MONOTONIC, &launch_start);
 
-	int err = pthread_create(&thread_id, NULL, thread_func, (void*)&thread_arg);
-	pthreadErrorHandle(err, PTHREAD_PASS, "Thread create error");
+	err = pthread_create(&thread, NULL, thread_func, (void*)&thread_arg);
+	if (err != 0)
+        throwErr("Error: thread create error!");
 
 	clock_gettime(CLOCK_MONOTONIC, &launch_stop);
 
-	pthread_join(thread_id, NULL);
-	pthreadErrorHandle(err, PTHREAD_PASS, "Thread join error");
+	pthread_join(thread, NULL);
+	if (err != 0)
+        throwErr("Error: thread join error!");
 
-	return (ThreadStat){clocktimeDifference(launch_start, launch_stop), thread_arg.elapsed_time};
+	return (ThreadStat){clocktimeDifference(launch_start, launch_stop), 
+						thread_arg.elapsed_time};
 }

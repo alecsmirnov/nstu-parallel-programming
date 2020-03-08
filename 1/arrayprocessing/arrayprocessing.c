@@ -3,47 +3,49 @@
 #include <string.h>
 #include <pthread.h>
 
-// Код прохождения обработки
-#define PTHREAD_PASS 0
-
 // Функция обработки ошибок
-#define pthreadErrorHandle(test_code, pass_code, err_msg) do {		\
-	if (test_code != pass_code) {									\
-		fprintf(stderr, "%s%s\n", err_msg, strerror(test_code));	\
-		exit(EXIT_FAILURE);											\
-	}																\
+#define throwErr(msg) do {          \
+    fprintf(stderr, "%s\n", msg);   \
+    exit(EXIT_FAILURE);             \
 } while (0)
 
-// Параметры потока
-typedef struct ThreadParam {
+// Параметры потока (блок данных для обработки)
+typedef struct Chunk {
 	double* A;			// Указатель на массив
 	uint32_t size;		// Размер массива
 
 	func_ptr func;		// Функция обработки элемента
-} ThreadParam;
+} Chunk;
 
 static void* threadFunc(void* arg) {
-	ThreadParam* thread_param = (ThreadParam*)arg;
+	Chunk* chunk = (Chunk*)arg;
 
-	for (uint32_t i = 0; i != thread_param->size; ++i)
-		thread_param->A[i] = thread_param->func(thread_param->A[i]);
+	for (uint32_t i = 0; i != chunk->size; ++i)
+		chunk->A[i] = chunk->func(chunk->A[i]);
 
 	pthread_exit(NULL);
 }
 
 // Обработка элементов массива
-void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func_ptr func) {
+void arrayProcessing(double* A, uint32_t size, func_ptr func, uint8_t threads_count) {
 	// Создаём необходимое количество потоков
 	pthread_t* threads = (pthread_t*)malloc(sizeof(pthread_t) * threads_count);
-	ThreadParam* threads_param = (ThreadParam*)malloc(sizeof(ThreadParam) * threads_count);
+	if (threads == NULL)
+        throwErr("Error: threads out of memmory!");
 
-	// Определяем размер чанков и остаток по размеру массива
-	int chunk_size = array_size / threads_count;
-	int remainder = array_size % threads_count;
+	Chunk* chunks = (Chunk*)malloc(sizeof(Chunk) * threads_count);
+	if (chunks == NULL)
+        throwErr("Error: chunks out of memmory!");
 
-	int err;
-	// Создаём потоки и разбиваем массив на чанки
-	for (uint32_t i = 0, shift = 0, part_size = chunk_size; i != threads_count; ++i, shift += part_size, part_size = chunk_size) {
+	// Определяем размер блоков и остаток по размеру массива
+	int chunk_size = size / threads_count;
+	int remainder = size % threads_count;
+
+	int err = 0;
+	// Создаём потоки и разбиваем массив на блоки
+	for (uint32_t i = 0, shift = 0, part_size = chunk_size; 
+		 i != threads_count; 
+		 ++i, shift += part_size, part_size = chunk_size) {
 		if (remainder) {
 			--remainder;
 			++part_size;
@@ -51,18 +53,20 @@ void arrayProcessing(double* A, uint32_t array_size, uint8_t threads_count, func
 
 		// Записываем в параметр потока ту часть массива,
 		// которую он будет обрабатывать, и указатель на функцию обработки
-		threads_param[i] = (ThreadParam){A + shift, part_size, func};
+		chunks[i] = (Chunk){A + shift, part_size, func};
 
-		err = pthread_create(&threads[i], NULL, threadFunc, (void*)&threads_param[i]);
-		pthreadErrorHandle(err, PTHREAD_PASS, "Cannot create a thread: ");
+		err = pthread_create(&threads[i], NULL, threadFunc, (void*)&chunks[i]);
+		if (err != 0)
+        	throwErr("Error: cannot create a thread: ");
 	}
 
 	// Ожидаем завершения созданных потоков перед завершением работы программы
 	for (uint8_t i = 0; i != threads_count; ++i) {
 		err = pthread_join(threads[i], NULL);
-		pthreadErrorHandle(err, PTHREAD_PASS, "Cannot join a thread");
+		if (err != 0)
+        	throwErr("Error: cannot join a thread");
 	}
 
 	free(threads);
-	free(threads_param);
+	free(chunks);
 }

@@ -5,10 +5,11 @@
 
 #include "server.h"
 
-// Количество аргументов командной строки
 #define ARGS_COUNT 4
 
-#define TIME_MINUTE 60
+// Параметры ожидания для ждущего потока
+#define TIME_MINUTE     60		// Минута
+#define THREAD_WAIT_MIN 10 		// Кол-во минут
 
 // Препроцессор для формирования строковых констант
 #define TEXT_QUOTE(...) #__VA_ARGS__
@@ -60,9 +61,11 @@ static const char* RESPONSE_TEMPLATE_PHP = TEXT_QUOTE(
 static void* threadFunc(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 
-	size_t response_size = strlen(RESPONSE_TEMPLATE) + intDigitsCount(thread_param->request_num);
+	size_t response_size = strlen(RESPONSE_TEMPLATE) + 
+						   intDigitsCount(thread_param->request_num);
 	char* response = (char*)malloc(sizeof(char) * response_size);
-	snprintf(response, response_size, RESPONSE_TEMPLATE, response_size, thread_param->request_num);
+	snprintf(response, response_size, RESPONSE_TEMPLATE, response_size, 
+			 thread_param->request_num);
 
 	clientWrite(thread_param->client_fd, response, response_size);
 	clientClose(thread_param->client_fd);
@@ -82,9 +85,11 @@ static void* threadFuncPHP(void* arg) {
 	if (fscanf(fp, "%s", php_version) == 1) {
 		pclose(fp);
 
-		size_t response_size = strlen(RESPONSE_TEMPLATE_PHP) + intDigitsCount(thread_param->request_num) + PHP_VERSION_LEN;
+		size_t response_size = strlen(RESPONSE_TEMPLATE_PHP) + 
+							   intDigitsCount(thread_param->request_num) + PHP_VERSION_LEN;
 		char* response = (char*)malloc(sizeof(char) * response_size);
-		snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, response_size, thread_param->request_num, php_version);
+		snprintf(response, response_size, RESPONSE_TEMPLATE_PHP, 
+				 response_size, thread_param->request_num, php_version);
 		
 		clientWrite(thread_param->client_fd, response, response_size);
 		free(response);
@@ -99,7 +104,7 @@ static void* threadFuncWait(void* arg) {
 	ThreadParam* thread_param = (ThreadParam*)arg;
 	clientClose(thread_param->client_fd);
 
-	sleep(10 * TIME_MINUTE);
+	sleep(THREAD_WAIT_MIN * TIME_MINUTE);
 
 	pthread_exit(NULL);	
 }
@@ -108,7 +113,8 @@ int main(int argc, char* argv[]) {
 	if (argc < ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of arguments!\n");
 		fprintf(stderr, "Enter: <func num> <stack size num> <clear pull>\n");
-		fprintf(stderr, "(Func number: 0 - std, 1 - php, 2 - wait; Stack size num: 0 - 512 KB, 1 - 1 MB, 2 - 2 MB)\n");
+		fprintf(stderr, "(Func number: 0 - std, 1 - php, 2 - wait; "
+						"Stack size num: 0 - 512 KB, 1 - 1 MB, 2 - 2 MB)\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -123,7 +129,7 @@ int main(int argc, char* argv[]) {
 		case 2: thread_func = threadFuncWait; break;
 	}
 
-	size_t stack_size = 2 * MB;
+	size_t stack_size = DEFAULT_STACK_SIZE;
 	switch (stack_size_num) {
 		case 0: stack_size = 512 * KB; break;
 		case 1: stack_size =   1 * MB; break;

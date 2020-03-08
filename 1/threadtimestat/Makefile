@@ -1,20 +1,21 @@
 DEFINES = -D_POSIX_C_SOURCE -D_BSD_SOURCE
 CFLAGS  = -std=c99 -O0 -g $(DEFINES)
-LIBS    = -lpthread
+LIBS    = -lpthread -lm
+TARGET  = threadtimestat
 
-all: threadtimestat cleanTemp
+all: $(TARGET) cleanTemp
 
-threadtimestat: threadtimestat_main.o threadtimestat.o
-	gcc $(CFLAGS) -o threadtimestat threadtimestat_main.o threadtimestat.o $(LIBS)
+$(TARGET): $(TARGET)_main.o $(TARGET).o
+	gcc $(CFLAGS) -o $(TARGET) $(TARGET)_main.o $(TARGET).o $(LIBS)
 
-threadtimestat_main.o: threadtimestat_main.c threadtimestat.h
-	gcc $(CFLAGS) -c threadtimestat_main.c
+$(TARGET)_main.o: $(TARGET)_main.c $(TARGET).h
+	gcc $(CFLAGS) -c $(TARGET)_main.c
 
-threadtimestat.o: threadtimestat.c threadtimestat.h
-	gcc $(CFLAGS) -c threadtimestat.c
+$(TARGET).o: $(TARGET).c $(TARGET).h
+	gcc $(CFLAGS) -c $(TARGET).c
 
 cleanTemp:
 	rm -rf *.o
 
 clean:
-	rm -rf threadtimestat
+	rm -rf $(TARGET)

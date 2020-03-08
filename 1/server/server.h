@@ -6,6 +6,9 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+// list data structure from: https://github.com/alecsmirnov/doubly-linked-list
+#include "list.h"
+
 #define SERVER_PORT 8080
 
 // Единицы размеров для стека
