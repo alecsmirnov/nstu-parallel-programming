@@ -1,18 +1,18 @@
 #ifndef CMPSYNCPRIMITIVES_H
 #define CMPSYNCPRIMITIVES_H
 
-#include <stdlib.h>
 #include <stdint.h>
 
-#define LOCKS_COUNT 10000000
+// Количество блокировок потока (доступов к общим данным)
+#define LOCKS_COUNT 100000000
 
-typedef void (*test_func)(size_t);
-
+// Тип используемого примитива
 typedef enum SyncPrimitive {
     MUTEX,
     SPINLOCK
 } SyncPrimitive;
 
-double primitiveTimeStat(test_func func, SyncPrimitive primitive, uint8_t threads_count);
+// Время работы примитива с указанной функцией, кол-вом потоков
+double primitiveTimeStat(SyncPrimitive primitive, uint8_t threads_count);
 
 #endif
