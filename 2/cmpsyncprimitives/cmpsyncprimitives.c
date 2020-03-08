@@ -1,4 +1,3 @@
-
 #include "cmpsyncprimitives.h"
 
 #include <stdio.h>
@@ -92,6 +91,9 @@ static void primitiveTypeInit(PrimitiveType* primitive_type, SyncPrimitive primi
             break;
         }
     }
+
+    if (primitive_type->type == NULL)
+        throwErr("Error: primitive type out of memmory!");
 }
 
 // Время работы примитива с указанной функцией, кол-вом потоков
@@ -110,6 +112,9 @@ double primitiveTimeStat(SyncPrimitive primitive, uint8_t threads_count) {
 
     // Формирование потоков и их аргументов
     pthread_t* threads = (pthread_t*)malloc(sizeof(pthread_t) * threads_count);
+    if (threads == NULL)
+        throwErr("Error: threads out of memmory!");
+
     ThreadArg threads_arg = (ThreadArg){primitive_type.lock_func, 
                                         primitive_type.unlock_func, 
                                         primitive_type.type, &shared_data};
