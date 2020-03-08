@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 #include "mapreduce.h"
@@ -15,37 +13,18 @@
 	1.0 * (stop.tv_sec - start.tv_sec) +            \
     1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
+// Map функции
 static double mapFuncInc(double val) {
 	return val + 1;
 }
 
+// Reduce функции
 static double reduceFuncPlus(double result, double b) {
 	return result + b;
 }
 
 static double reduceFuncMult(double result, double b) {
 	return result * b;
-}
-
-static double* arrayCreate(uint32_t size) {
-	double* A = (double*)malloc(sizeof(double) * size);
-	return A;
-}
-
-static void arrayRandInit(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		A[i] = rand() % size;
-}
-
-static void arrayCopy(double* dest, double* src, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		dest[i] = src[i];
-}
-
-static void arryPrint(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		printf("%g ", A[i]);
-	printf("\n");
 }
 
 static void testResultOutput(FILE* fp, uint8_t threads_count, 
@@ -85,6 +64,31 @@ static void testResultOutput(FILE* fp, uint8_t threads_count,
 	}
 }
 
+static void test(int argc, char* argv[]) {
+	if (argc < TEST_ARGS_COUNT) {
+		fprintf(stderr, "Wrong number of arguments!\n");
+		fprintf(stderr, "Enter: <threads count> <array size min> " 
+						"<array size max> <measure count>\n");
+		exit(EXIT_FAILURE);
+	}
+
+	srand(time(NULL));
+
+	uint8_t threads_count = atoi(argv[1]);
+	uint32_t array_size_min = atoi(argv[2]);
+	uint32_t array_size_max = atoi(argv[3]);
+	size_t measure_count = atoi(argv[4]);
+
+	FILE* fp = fopen(RESULT_FILENAME, "w");
+
+	printf("Program execution...\n");
+	testResultOutput(fp, threads_count, array_size_min, 
+	                 array_size_max, measure_count);
+	printf("Done.\n");
+
+	fclose(fp);
+}
+
 static void demonstration(int argc, char* argv[]) {
 	if (argc < DEMO_ARGS_COUNT) {
 		fprintf(stderr, "Wrong number of arguments!\n");
@@ -120,31 +124,6 @@ static void demonstration(int argc, char* argv[]) {
 	printf("\nElapsed time: %lf\n", elapsed_time);
 
 	free(A);
-}
-
-static void test(int argc, char* argv[]) {
-	if (argc < TEST_ARGS_COUNT) {
-		fprintf(stderr, "Wrong number of arguments!\n");
-		fprintf(stderr, "Enter: <threads count> <array size min>" 
-							   "<array size max> <measure count>\n");
-		exit(EXIT_FAILURE);
-	}
-
-	srand(time(NULL));
-
-	uint8_t threads_count = atoi(argv[1]);
-	uint32_t array_size_min = atoi(argv[2]);
-	uint32_t array_size_max = atoi(argv[3]);
-	size_t measure_count = atoi(argv[4]);
-
-	FILE* fp = fopen(RESULT_FILENAME, "w");
-
-	printf("Program execution...\n");
-	testResultOutput(fp, threads_count, array_size_min, 
-	                 array_size_max, measure_count);
-	printf("Done.\n");
-
-	fclose(fp);
 }
 
 int main(int argc, char* argv[]) {
