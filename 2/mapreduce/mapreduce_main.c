@@ -14,26 +14,44 @@
 	1.0 * (stop.tv_sec - start.tv_sec) +            \
     1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
+// Функция map
+// Входные данные:
+// void* data;			// Массив данных
+// size_t size;			// размер массива
+// Выходные данные:
+// MRKeyVal* key_val;   // Список ключей-значений
 void mapFuncInc(MRArg* arg) {
+	// Преобразование массива к исходному типу
 	double* val = (double*)arg->val;
 
 	for (size_t i = 0; i != arg->size; ++i)
 		++val[i];
 
+	// Создание ключа типа size_t
 	size_t* key = (size_t*)malloc(sizeof(size_t));
 	*key = 1;
 
+	// Добавление результата к списку ключей-значений
 	mrEmitMap(&arg, (void*)key, (void*)val, arg->size);
 }
 
+// Функция reduce
+// Входные данные:
+// MRKeyVal* key_val;   // Список ключей-значений
+// Выходные данные:
+// void* data;			// Преобразованные данные
+// size_t size;			// Размер данных
 void reduceFuncMult(MRArg* arg) {
+	// Создание результат типа double*
 	double* result = (double*)malloc(sizeof(double));
 	*result = 1;
 
+	// Прохождение по всему списку ключей-значений
 	MRKeyValNode* iter = arg->key_val;
 	while (iter) {
 		size_t key = *(size_t*)iter->key;
 
+		// Проверка ключа для демонстрации
 		if (key == 1) {
 			double* val = (double*)iter->val;
 
@@ -44,6 +62,7 @@ void reduceFuncMult(MRArg* arg) {
 		iter = iter->next;
 	}
 
+	// Добавление результата в выходной список данных
 	mrEmitReduce(&arg, (void*)result, 1);
 }
 
@@ -71,7 +90,7 @@ static void arryPrint(double* A, uint32_t size) {
 static void testResultOutput(FILE* fp, uint8_t threads_count, 
                              uint32_t array_size_min, uint32_t array_size_max, 
 							 size_t measure_count) {
-	fprintf(fp, "size\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
+	fprintf(fp, "size:\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
 
 	for (uint32_t size = array_size_min; size < array_size_max; size *= 10) {
 		double* A_src = arrayCreate(size);
@@ -79,7 +98,7 @@ static void testResultOutput(FILE* fp, uint8_t threads_count,
 
 		arrayRandInit(A_src, size);
 
-		fprintf(fp, "%d:\t", size);
+		fprintf(fp, "%d\t", size);
 
 		for (uint8_t i = 0; i != threads_count; ++i) {
 			arrayCopy(A, A_src, size);
