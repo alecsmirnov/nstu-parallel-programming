@@ -12,42 +12,41 @@
 } while (0)
 
 // Указатель на фукнцию map/reduce
-typedef double (*func_ptr)();
+typedef void (*mrfunc_ptr)();
 
-// Блоки данных, на которые поделит ф-ия map
-typedef struct MPChunk {
-    func_ptr func;              // Ф-ия для обработки
-
-	double* A;                  // Преобразованный массив после ф-ии map 
-    uint32_t size;              // Размер массива
-
-    double result;              // Результат работы ф-й map и reduce
-} MPChunk;
+// Аргументы потока
+typedef struct ThreadArg {
+    mrfunc_ptr func;            // Указатель на ф-ию
+    void* arg;                  // Аргумент ф-ии
+} ThreadArg;
 
 // Данные программы 
-typedef struct MPData {
+typedef struct MRData {
     uint8_t threads_count;      // Кол-во потоков
     pthread_t* threads;
-    struct MPChunk* chunks;     // Блоки данных
 
-    map_func_ptr map;           // Ф-ия map
-    reduce_func_ptr reduce;     // Ф-ия reduce
+    MRArg* chunks;              // Блоки данных
+    MRArg* chunks_result;       // Результаты ф-ии reduce
 
-    double* A;
-    uint32_t size;
+    mfunc_ptr map;              // Ф-ия map
+    rfunc_ptr reduce;           // Ф-ия reduce
 
-    double result;
-} MPData;
+    void* val;                  // Данные
+    size_t size;                // Размер данных
+    size_t data_size;           // Размер типа данных
 
-static void mpDataChunksInit(MPData* mp_data) {
-    // Разбиение данных на равные блоки
-	int chunk_size = mp_data->size / mp_data->threads_count;
-	int remainder = mp_data->size % mp_data->threads_count;
+    MRResult* result;
+} MRData;
+
+// Инициализация блоков данных
+static void chunksInit(MRData* data) {
+	int chunk_size = data->size / data->threads_count;
+	int remainder = data->size % data->threads_count;
 
     // Дополнение блоков оставшимися элементами
     int err = 0;
-	for (uint32_t i = 0, shift = 0, part_size = chunk_size; 
-		 i != mp_data->threads_count; 
+	for (size_t i = 0, shift = 0, part_size = chunk_size; 
+		 i != data->threads_count; 
 		 ++i, shift += part_size, part_size = chunk_size) {
 		if (remainder) {
 			--remainder;
@@ -55,133 +54,175 @@ static void mpDataChunksInit(MPData* mp_data) {
 		}
 
         // Инициализация блоков данных
-		mp_data->chunks[i].A = &mp_data->A[shift];
-        mp_data->chunks[i].size = part_size;
+		data->chunks[i].val = data->val + data->data_size * shift;
+        data->chunks[i].size = part_size;
+        data->chunks[i].key_val = NULL;
     }
 }
 
 // Инициализация данных
-static void mpDataInit(MPData* mp_data, double* A, uint32_t size, 
-                       map_func_ptr map, reduce_func_ptr reduce, 
+static void dataInit(MRData* data, double* A, size_t size, size_t data_size,
+                       mfunc_ptr map, rfunc_ptr reduce, 
                        uint8_t threads_count) {
-    mp_data->A = A;
-    mp_data->size = size;
-    mp_data->result = 0;
+    data->val = A;
+    data->size = size;
+    data->data_size = data_size;
 
-    mp_data->map = map;
-    mp_data->reduce = reduce;
+    data->result = NULL;
 
-    mp_data->threads_count = threads_count < size ? threads_count : size;
-    if (mp_data->size < mp_data->threads_count)
-        mp_data->threads_count = 1;
+    data->map = map;
+    data->reduce = reduce;
 
-    mp_data->threads = (pthread_t*)malloc(sizeof(pthread_t) * mp_data->threads_count);
-    if (mp_data->threads == NULL)
+    data->threads_count = threads_count < size ? threads_count : size;
+
+    data->threads = (pthread_t*)malloc(sizeof(pthread_t) * data->threads_count);
+    if (data->threads == NULL)
         throwErr("Error: threads out of memmory!");
     
-    // Создание блоков для обработки
-    mp_data->chunks = (MPChunk*)malloc(sizeof(MPChunk) * mp_data->threads_count);
-    if (mp_data->chunks == NULL)
+    data->chunks = (MRArg*)malloc(sizeof(MRArg) * data->threads_count);
+    if (data->chunks == NULL)
         throwErr("Error: chunks out of memmory!");
+    
+    data->chunks_result = (MRArg*)malloc(sizeof(MRArg) * data->threads_count);
+    if (data->chunks_result == NULL)
+        throwErr("Error: chunks result out of memmory!");
 
-    mpDataChunksInit(mp_data);
+    chunksInit(data);
 }
 
-// Функция потока map
-static void* threadFuncMap(void* arg) {
-	MPChunk* chunk = (MPChunk*)arg;
-
-    // Обработка каждого элемента
-	for (uint32_t i = 0; i != chunk->size; ++i)
-		chunk->A[i] = chunk->func(chunk->A[i]);
+static void* threadFunc(void* arg) {
+	ThreadArg* chunk = (ThreadArg*)arg;
+    chunk->func(chunk->arg);
 
 	pthread_exit(NULL);
 }
 
 // Потоковая обработка массива функцией map
-static void releaseMap(MPData* mp_data) {
-
-    // Разбиение данных на блоки
-	int chunk_size = mp_data->size / mp_data->threads_count;
-	int remainder = mp_data->size % mp_data->threads_count;
+static void releaseMap(MRData* data) {
+    ThreadArg* threads_arg = (ThreadArg*)malloc(sizeof(ThreadArg) * data->threads_count);
+    if (threads_arg == NULL)
+        throwErr("Error: map threads arg out of memmory!");
 
     int err = 0;
-	for (uint8_t i = 0; i != mp_data->threads_count; ++i) {
-        // Определение ф-ии
-        mp_data->chunks[i].func = mp_data->map;
+	for (uint8_t i = 0; i != data->threads_count; ++i) {
+        threads_arg[i].func = data->map;
+        threads_arg[i].arg = &data->chunks[i];
 
-		err = pthread_create(&mp_data->threads[i], NULL, threadFuncMap, 
-                             (void*)&mp_data->chunks[i]);
+		err = pthread_create(&data->threads[i], NULL, threadFunc, (void*)&threads_arg[i]);
 		if (err != 0)
             throwErr("Error: cannot create a map thread!");
 	}
 
-	for (uint8_t i = 0; i != mp_data->threads_count; ++i) {
-		err = pthread_join(mp_data->threads[i], NULL);
+	for (uint8_t i = 0; i != data->threads_count; ++i) {
+		err = pthread_join(data->threads[i], NULL);
 		if (err != 0)
             throwErr("Error: cannot join a map thread!");
 	}
+
+    free(threads_arg);
 }
 
-// Функция потока reduce
-static void* threadFuncReduce(void* arg) {
-	MPChunk* chunk = (MPChunk*)arg;
+// Формирование результата
+static void formResult(MRResult** result, void* val, size_t size) {
+    MRResultNode* new_node = (MRResultNode*)malloc(sizeof(MRResultNode));
+    if (new_node == NULL)
+        throwErr("Error: new node out of memmory!");
 
-    // Объединение данных
-	for (uint32_t i = 0; i != chunk->size - 1; ++i)
-        chunk->result = chunk->func(chunk->result, chunk->A[i + 1]);
+    new_node->val = val;
+    new_node->size = size;
 
-	pthread_exit(NULL);
+    new_node->next = *result;
+    *result = new_node;
 }
 
 // Потоковая обработка массива функцией reduce
-static void releaseReduce(MPData* mp_data) {
-    int err = 0;
-    for (uint8_t i = 0; i != mp_data->threads_count; ++i) {
-        // Определение ф-ии
-        mp_data->chunks[i].func = mp_data->reduce;
-        // Инициализация результирующей переменной блока
-        mp_data->chunks[i].result = mp_data->chunks[i].A[0];
+static void releaseReduce(MRData* data) {
+    ThreadArg* threads_arg = (ThreadArg*)malloc(sizeof(ThreadArg) * data->threads_count);
+    if (threads_arg == NULL)
+        throwErr("Error: reduce threads arg out of memmory!");
 
-    	err = pthread_create(&mp_data->threads[i], NULL, threadFuncReduce, 
-                             (void*)&mp_data->chunks[i]);
+    int err = 0;
+ 	for (uint8_t i = 0; i != data->threads_count; ++i) {
+        data->chunks_result[i].val = NULL;
+        data->chunks_result[i].size = 0;
+        data->chunks_result[i].key_val = data->chunks[i].key_val;
+
+        threads_arg[i].func = data->reduce;
+        threads_arg[i].arg = &data->chunks_result[i];
+
+		err = pthread_create(&data->threads[i], NULL, threadFunc, (void*)&threads_arg[i]);
 		if (err != 0)
-            throwErr("Error: cannot create a reduce thread!");
-    }
+            throwErr("Error: cannot create a map thread!");
+	}  
     
-    for (uint8_t i = 0; i != mp_data->threads_count; ++i) {
-		err = pthread_join(mp_data->threads[i], NULL);
+    for (uint8_t i = 0; i != data->threads_count; ++i) {
+		err = pthread_join(data->threads[i], NULL);
 		if (err != 0)
             throwErr("Error: cannot join a reduce thread");
+
+        // Объединение всех результатов в один список
+        formResult(&data->result, data->chunks_result[i].val, data->chunks_result[i].size);
 	}
 
-    // Объединение результатов из блоков, после обработки reduce
-    mp_data->result = mp_data->chunks[0].result;
-    for (uint8_t i = 0; i != mp_data->threads_count - 1; ++i)
-        mp_data->result = mp_data->reduce(mp_data->result, 
-                                          mp_data->chunks[i + 1].result);
+    free(threads_arg);
 }
 
 // Очистка блоков
-static void mpDataClear(MPData* mp_data) {
-    free(mp_data->threads);
-    free(mp_data->chunks);
+static void dataClear(MRData* data) {
+    free(data->threads);
+
+    // Очистка ключей
+    for (uint8_t i = 0; i != data->threads_count; ++i) {
+        MRKeyValNode* iter = data->chunks[i].key_val;
+
+        while (iter) {
+            MRKeyValNode* prev = iter;
+            iter = iter->next;
+
+            if (prev->key)
+                free(prev->key);
+            free(prev); 
+        }
+    }
+
+    free(data->chunks);
+    free(data->chunks_result);
+}
+
+void mrEmitMap(MRArg** arg, void* key, void* val, size_t size) {
+    MRKeyValNode* new_node = (MRKeyValNode*)malloc(sizeof(MRKeyValNode));
+    if (new_node == NULL)
+        throwErr("Error: new node out of memmory!");
+
+    new_node->key = key;
+    new_node->val = val;
+    new_node->size = size;
+    
+    new_node->next = (*arg)->key_val;
+    (*arg)->key_val = new_node;
+}
+
+void mrEmitReduce(MRArg** arg, void* val, size_t size) {
+    (*arg)->val = val;
+    (*arg)->size = size;
 }
 
 // Обработка массива по модели mapReduce
-double mapReduceArray(double* A, uint32_t size, 
-                      map_func_ptr map, reduce_func_ptr reduce, 
-                      uint8_t threads_count) {
-    MPData mp_data;
-    mpDataInit(&mp_data, A, size, map, reduce, threads_count);
+MRResult* mrArray(void* A, size_t size, size_t data_size,
+                 mfunc_ptr map, rfunc_ptr reduce, 
+                 uint8_t threads_count) {
+    MRData data;
+    dataInit(&data, A, size, data_size, map, reduce, threads_count);
 
     if (map)
-        releaseMap(&mp_data);
+        releaseMap(&data);
 
     if (reduce)
-        releaseReduce(&mp_data);
+        releaseReduce(&data);
+    else 
+        formResult(&data.result, data.val, data.size);
 
-    mpDataClear(&mp_data);
+    dataClear(&data);
 
-    return mp_data.result;
+    return data.result;
 }

@@ -1,38 +1,50 @@
 #ifndef MAPREDUCE_H
 #define MAPREDUCE_H
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 
+// Результать работы функции map
+typedef struct MRKeyValNode {
+    void* key;					// Ключ
+	
+	void* val;					// Данные
+    size_t size;				// Размер данных
+
+    struct MRKeyValNode* next;	// Следующий элемент
+} MRKeyValNode, MRKeyVal;
+
+// Аргумент функций map/reduce
+typedef struct MRArg {
+	// Входные значения для ф-ии map
+	// (Выходные значения для ф-ии reduce)
+	void* val;
+	size_t size;
+
+	// Выходное значение для ф-ии map
+	// (Входное значение для ф-ии reduce)
+    MRKeyVal* key_val;
+} MRArg;
+
+// Результат работы программы
+typedef struct MRResultNode {
+	void* val;					// Данные
+    size_t size;				// Размер данных
+
+	struct MRResultNode* next;
+} MRResultNode, MRResult;
+
 // Указатели на функцию map, reduce
-typedef double (*map_func_ptr)(double value);
-typedef double (*reduce_func_ptr)(double result, double value);
+typedef void (*mfunc_ptr)(MRArg*);
+typedef void (*rfunc_ptr)(MRArg*);
 
-static inline double* arrayCreate(uint32_t size) {
-	double* A = (double*)malloc(sizeof(double) * size);
-	return A;
-}
-
-static inline void arrayRandInit(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		A[i] = rand() % size;
-}
-
-static inline void arrayCopy(double* dest, double* src, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		dest[i] = src[i];
-}
-
-static inline void arryPrint(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		printf("%g ", A[i]);
-	printf("\n");
-}
+// Запись результата функций
+void mrEmitMap(MRArg** arg, void* key, void* val, size_t size);
+void mrEmitReduce(MRArg** arg, void* val, size_t size);
 
 // Обработка массива по модели mapReduce
-double mapReduceArray(double* A, uint32_t size, 
-                      map_func_ptr map, reduce_func_ptr reduce, 
-                      uint8_t threads_count);
+MRResult* mrArray(void* A, size_t size, size_t data_size,
+				 mfunc_ptr map, rfunc_ptr reduce,
+                 uint8_t threads_count);
 
 #endif

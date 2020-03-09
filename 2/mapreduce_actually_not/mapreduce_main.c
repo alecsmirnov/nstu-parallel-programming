@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <time.h>
 
 #include "mapreduce.h"
@@ -14,58 +13,18 @@
 	1.0 * (stop.tv_sec - start.tv_sec) +            \
     1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
-void mapFuncInc(MRArg* arg) {
-	double* val = (double*)arg->val;
-
-	for (size_t i = 0; i != arg->size; ++i)
-		++val[i];
-
-	size_t* key = (size_t*)malloc(sizeof(size_t));
-	*key = 1;
-
-	mrEmitMap(&arg, (void*)key, (void*)val, arg->size);
+// Map функции
+static double mapFuncInc(double val) {
+	return val + 1;
 }
 
-void reduceFuncMult(MRArg* arg) {
-	double* result = (double*)malloc(sizeof(double));
-	*result = 1;
-
-	MRKeyValNode* iter = arg->key_val;
-	while (iter) {
-		size_t key = *(size_t*)iter->key;
-
-		if (key == 1) {
-			double* val = (double*)iter->val;
-
-			for (size_t i = 0; i != iter->size; ++i)
-				*result *= val[i];
-		}
-
-		iter = iter->next;
-	}
-
-	mrEmitReduce(&arg, (void*)result, 1);
+// Reduce функции
+static double reduceFuncPlus(double result, double b) {
+	return result + b;
 }
 
-static double* arrayCreate(uint32_t size) {
-	double* A = (double*)malloc(sizeof(double) * size);
-	return A;
-}
-
-static void arrayRandInit(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		A[i] = rand() % size;
-}
-
-static void arrayCopy(double* dest, double* src, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		dest[i] = src[i];
-}
-
-static void arryPrint(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
-		printf("%g ", A[i]);
-	printf("\n");
+static double reduceFuncMult(double result, double b) {
+	return result * b;
 }
 
 static void testResultOutput(FILE* fp, uint8_t threads_count, 
@@ -89,8 +48,7 @@ static void testResultOutput(FILE* fp, uint8_t threads_count,
 				struct timespec start, stop;
 				clock_gettime(CLOCK_MONOTONIC, &start);
 
-				mrArray((void*)A, size, sizeof(double), 
-						mapFuncInc, reduceFuncMult, i + 1);	
+				mapReduceArray(A, size, mapFuncInc, reduceFuncPlus, i + 1);
 
 				clock_gettime(CLOCK_MONOTONIC, &stop);
 				elapsed_time += clocktimeDifference(start, stop);
@@ -149,22 +107,21 @@ static void demonstration(int argc, char* argv[]) {
 	printf("Source array:\n");
 	arryPrint(A, size);
 
-	MRResult* result = mrArray((void*)A, size, sizeof(double), 
-							   mapFuncInc, reduceFuncMult, 
-							   threads_count);	
+	struct timespec start, stop;
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
-	printf("Transformed array:\n");
+	double result = mapReduceArray(A, size, mapFuncInc, 
+	                               reduceFuncMult, threads_count);
+
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+	double elapsed_time = clocktimeDifference(start, stop);
+
+	printf("\nMap result:\n");
 	arryPrint(A, size);
 
-	printf("\nMapReduce result:\n");
+	printf("\nMapReduce result:\n%g\n", result);
 
-	MRResult* iter = result;
-	while (iter) {
-		if (iter->val)
-			printf("%g\n", *(double*)iter->val);
-
-		iter = iter->next;
-	}
+	printf("\nElapsed time: %lf\n", elapsed_time);
 
 	free(A);
 }
@@ -175,8 +132,6 @@ int main(int argc, char* argv[]) {
 	#else 
 	demonstration(argc, argv);
 	#endif
-
-    return 0;
 
     return 0;
 }
