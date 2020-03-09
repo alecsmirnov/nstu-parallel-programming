@@ -71,7 +71,7 @@ void condVarInit(CondVar* cond) {
     if (cond->queue == NULL)
         throwErr("Error: condition queue out of memmory!");
 
-    cond->queue = NULL;
+    cond->queue = (CondQueue*)malloc(sizeof(CondQueue));
 }
 
 // Блокировка до наступления события
@@ -84,7 +84,7 @@ void condVarWait(CondVar* cond, pthread_mutex_t* mutex) {
     // Сохраняем состояние потока
     bool* lock = (bool*)malloc(sizeof(bool));
     *lock = true;
-    condQueueSet(&cond->queue, lock);
+    condQueueSet(cond->queue, lock);
 
     // Освобождаем условную переменную
     err = pthread_mutex_unlock(&cond->mutex);
@@ -115,7 +115,7 @@ void condVarSignal(CondVar* cond) {
         throwErr("Error: cannot lock condition mutex!");
 
     // Посылаем сигнал хотя бы одному потоку
-    bool* lock = condQueueGet(&cond->queue);
+    bool* lock = condQueueGet(cond->queue);
     if (lock)
         *lock = false;
 
@@ -134,7 +134,7 @@ void condVarBroadcast(CondVar* cond) {
 
     // Посылаем сигнал всем потокам
     bool* lock = NULL;
-    while ((lock = condQueueGet(&cond->queue))) 
+    while ((lock = condQueueGet(cond->queue))) 
         *lock = false;
 
     // Освобождаем условную переменную
@@ -146,6 +146,6 @@ void condVarBroadcast(CondVar* cond) {
 // Уничтожение условной переменнной
 void condVarDestroy(CondVar* cond) {
     pthread_mutex_destroy(&cond->mutex);
-    while (condQueueGet(&cond->queue));
+    while (condQueueGet(cond->queue));
     free(cond->queue);
 }
