@@ -4,47 +4,45 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-// Результать работы функции map
-typedef struct MRKeyValNode {
+// Результать работы функций map/reduce
+typedef struct KeyValNode {
     void* key;					// Ключ
-	
 	void* val;					// Данные
-    size_t size;				// Размер данных
+    size_t size;				// Размер
 
-    struct MRKeyValNode* next;	// Следующий элемент
-} MRKeyValNode, MRKeyVal;
+    struct KeyValNode* next;	// Следующий элемент
+} KeyValNode;
 
-// Аргумент функций map/reduce
-typedef struct MRArg {
-	// Входные значения для ф-ии map
-	// (Выходные значения для ф-ии reduce)
-	void* val;
-	size_t size;
-
-	// Выходное значение для ф-ии map
-	// (Входное значение для ф-ии reduce)
-    MRKeyVal* key_val;
-} MRArg;
-
-// Результат работы программы
-typedef struct MRResultNode {
+// Аргумент функций map
+typedef struct MapArg {
+	// Входные данные:
 	void* val;					// Данные
-    size_t size;				// Размер данных
+	size_t size;				// Размер
 
-	struct MRResultNode* next;
-} MRResultNode, MRResult;
+	// Выходные данные:
+    KeyValNode* key_val;		// Список ключей-значений
+} MapArg;
 
-// Указатели на функцию map, reduce
-typedef void (*mfunc_ptr)(MRArg*);
-typedef void (*rfunc_ptr)(MRArg*);
+// Аргумент функций reduce
+typedef struct ReduceArg {
+	// Входные данные:
+    KeyValNode* key_val;		// Список ключей-значений из функции map
 
-// Запись результата функций
-void mrEmitMap(MRArg** arg, void* key, void* val, size_t size);
-void mrEmitReduce(MRArg** arg, void* val, size_t size);
+	// Выходные данные:
+	KeyValNode* collection;		// Сжатый список ключей значений
+} ReduceArg;
+
+// Указатели на функцию map, reduce, merge
+typedef void (*map_ptr)(MapArg*);
+typedef void (*reduce_ptr)(ReduceArg*);
+typedef void* (*merge_ptr)(KeyValNode**, uint8_t);
+
+// Запись результата функций map/reduce
+void emitIntermediate(KeyValNode** result, void* key, void* val, size_t size);
 
 // Обработка массива по модели mapReduce
-MRResult* mrArray(void* A, size_t size, size_t data_size,
-				 mfunc_ptr map, rfunc_ptr reduce,
-                 uint8_t threads_count);
+void* mapReduceChunk(void* val, size_t val_size, size_t size,
+					 map_ptr map, reduce_ptr reduce, merge_ptr merge,
+					 uint8_t threads_count);
 
 #endif
