@@ -31,7 +31,7 @@ static double revFunc(double val) {
 // Функция расчёта времени обработки элементов массива на указанном количестве потоков,
 // с указанным начальным и конечным размером массива
 static void resultOutput(FILE* fp, uint8_t threads_count, 
-						 uint32_t array_size_min, uint32_t array_size_max, 
+						 size_t array_size_min, size_t array_size_max, 
 						 uint8_t func_num, size_t measure_count) {
 	// Определение функции обработки элемента массива
 	func_ptr array_func = sqrFunc;
@@ -42,10 +42,10 @@ static void resultOutput(FILE* fp, uint8_t threads_count,
 	}
 
 	// Составление таблицы
-	fprintf(fp, "size\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
+	fprintf(fp, "size:\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
 
 	// Увеличение размера массива
-	for (uint32_t array_size = array_size_min; array_size < array_size_max; array_size *= 10) {
+	for (size_t array_size = array_size_min; array_size < array_size_max; array_size *= 10) {
 		// Создание исходного массива и массива для многократной обработки,
 		// для обеспечения одинаковых данных на всех испытаниях
 		double* A_src = arrayCreate(array_size);
@@ -54,7 +54,7 @@ static void resultOutput(FILE* fp, uint8_t threads_count,
 		// Инициализация исходного массива
 		arrayRandInit(A_src, array_size);
 
-		fprintf(fp, "%d:\t", array_size);
+		fprintf(fp, "%zu\t", array_size);
 
 		for (uint8_t i = 0; i != threads_count; ++i) {
 			// Копирование данных из исходного массива в массив обработки
@@ -95,8 +95,8 @@ int main(int argc, char* argv[]) {
 	srand(time(NULL));
 
 	uint8_t threads_count = atoi(argv[1]);
-	uint32_t array_size_min = atoi(argv[2]);
-	uint32_t array_size_max = atoi(argv[3]);
+	size_t array_size_min = atoi(argv[2]);
+	size_t array_size_max = atoi(argv[3]);
 	uint8_t func_num = atoi(argv[4]);
 	size_t measure_count = atoi(argv[5]);
 
