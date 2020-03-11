@@ -3,20 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include <time.h>
-
-#define BILLION 1.0E+9
 
 // Функция обработки ошибок
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
     exit(EXIT_FAILURE);             \
 } while (0)
-
-// Функция вычета разности между временными величинами
-#define clocktimeDifference(start, stop)            \
-	1.0 * (stop.tv_sec - start.tv_sec) +            \
-    1.0 * (stop.tv_nsec - start.tv_nsec) / BILLION
 
 // Определение размера блока для потока
 #define chunkSize(i, chunk_size, n) \
@@ -56,8 +48,7 @@ typedef struct Prime {
 } Prime;
 
 // Инициализация данных
-static void primeDataInit(PrimeNumbers* prime_numbers, Prime* prime, 
-                          uint8_t threads_count, size_t n, size_t chunk_size) {
+static void primeDataInit(Prime* prime, uint8_t threads_count, size_t n, size_t chunk_size) {
     prime->threads_count = threads_count;
     prime->n = n - FIRST_VALUE;
     prime->chunk_size = chunk_size;
@@ -95,10 +86,6 @@ static void primeDataInit(PrimeNumbers* prime_numbers, Prime* prime,
         if (err != 0)
 		    throwErr("Error: cannot initialize conditin variable!");
     }
-
-    prime_numbers->data = prime->data;
-    prime_numbers->n = prime->n;
-    prime_numbers->elapsed_time = 0;
 }
 
 // Фильтрация данных потока
@@ -253,14 +240,12 @@ static void primeDataFree(Prime* prime) {
 
 // Поиск простых чисел по: кол-ву потоков, числу n, размеру блока для потока
 PrimeNumbers sieveStart(uint8_t threads_count, size_t n, size_t chunk_size) {
-    PrimeNumbers prime_numbers;
     Prime prime;
 
     // Инициализация данных
-    primeDataInit(&prime_numbers, &prime, threads_count, n, chunk_size);
+    primeDataInit(&prime, threads_count, n, chunk_size);
 
-    struct timespec start, stop;
-	clock_gettime(CLOCK_MONOTONIC, &start);
+    PrimeNumbers prime_numbers = (PrimeNumbers){prime.data, prime.n};
 
     // Создание потоков для обработки поступающей работы
     int err = 0;
@@ -278,9 +263,6 @@ PrimeNumbers sieveStart(uint8_t threads_count, size_t n, size_t chunk_size) {
 		 if (err != 0)
 		    throwErr("Error: cannot join a thread!");
 	}
-
-    clock_gettime(CLOCK_MONOTONIC, &stop);
-    prime_numbers.elapsed_time = clocktimeDifference(start, stop);
 
     primeDataFree(&prime);
 

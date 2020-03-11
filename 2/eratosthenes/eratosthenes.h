@@ -12,8 +12,6 @@
 typedef struct PrimeNumbers {
     bool* data;             // Статус числа в списке
     size_t n;               // Кол-во чисел списка
-
-    double elapsed_time;    // Время формирования
 } PrimeNumbers;
 
 // Получить число из списка по индексу
@@ -26,8 +24,7 @@ static inline void printPrimeNumbers(const PrimeNumbers* prime_numbers) {
     for (size_t i = 0; i != prime_numbers->n; ++i)
         if (prime_numbers->data[i])
             printf("%zu ", valFromIndex(i));
-    
-    printf("\n\nElapsed time: %lf\n", prime_numbers->elapsed_time);
+    printf("\n");
 }
 
 // Поиск простых чисел по: кол-ву потоков, числу n, размеру блока для потока
