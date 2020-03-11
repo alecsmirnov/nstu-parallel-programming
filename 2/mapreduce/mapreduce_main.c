@@ -98,23 +98,23 @@ void* merge(KeyValNode** collections, uint8_t count) {
 	return (void*)result;
 }
 
-static double* arrayCreate(uint32_t size) {
+static double* arrayCreate(size_t size) {
 	double* A = (double*)malloc(sizeof(double) * size);
 	return A;
 }
 
-static void arrayRandInit(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
+static void arrayRandInit(double* A, size_t size) {
+	for (size_t i = 0; i != size; ++i)
 		A[i] = rand() % size;
 }
 
-static void arrayCopy(double* dest, double* src, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
+static void arrayCopy(double* dest, double* src, size_t size) {
+	for (size_t i = 0; i != size; ++i)
 		dest[i] = src[i];
 }
 
-static void arryPrint(double* A, uint32_t size) {
-	for (uint32_t i = 0; i != size; ++i)
+static void arryPrint(double* A, size_t size) {
+	for (size_t i = 0; i != size; ++i)
 		printf("%g ", A[i]);
 	printf("\n");
 }
