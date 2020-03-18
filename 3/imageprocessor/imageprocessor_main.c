@@ -3,26 +3,60 @@
 
 #include "imageprocessor.h"
 
-#define INPUT_FILENAME  "kitten-gav.bmp"
-#define OUTPUT_FILENAME "kitten-gav-filtered.bmp"
+#define INPUT_FILENAME "kitten-gav.bmp"
 
 int main(int argc, char* argv[]) {
     BMPImage image;
     readBMPFile(INPUT_FILENAME, &image);
 
-    double* filter = NULL;
-    uint8_t filter_r = 0;
+    //--------------------------------------
+    BMPImage embos_image;
+    copyImage(&embos_image, &image);
 
-    filterCreate(double, filter, &filter_r, {
-        0, 1, 0,
-        1, 1, 1,
-        0, 1, 0
+    Filter embos;
+    embos.factor = 1;
+    embos.bias = 128;
+
+    filterCreate(embos, {
+        -1, -1,  0,
+        -1,  0,  1,
+        0,  1,  1
     });
 
-    filtration(&image, filter, filter_r);
-    free(filter);
+    filtration(&embos_image, embos);
+    free(embos.data);
 
-    writeBMPFile(OUTPUT_FILENAME, &image);
+    writeBMPFile("kitten-gav-embos.bmp", &embos_image);
+    free(embos_image.data);
+    
+    //--------------------------------------
+    BMPImage blur_image;
+    copyImage(&blur_image, &image);
+
+    Filter blur;
+    blur.factor = 1.0 / 9.0;
+    blur.bias = 0;
+
+    filterCreate(blur, {
+        1, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 1, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 1, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 1, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 1, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 1, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 1,
+    });
+
+    filtration(&blur_image, blur);
+    free(blur.data);
+
+    writeBMPFile("kitten-gav-blur.bmp", &blur_image);
+    free(blur_image.data);
+
+    //--------------------------------------
+    free(image.data);
 
     return 0;
 }

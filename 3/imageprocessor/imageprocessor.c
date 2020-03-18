@@ -4,8 +4,9 @@
 #include "imageprocessor.h"
 
 #define IMAGE_BITNESS 32 
-#define PIXEL_SIZE    4
-#define BYTE_SIZE     8
+
+#define PIXEL_SIZE 4
+#define BYTE_SIZE  8
 
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
@@ -14,9 +15,6 @@
 
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #define min(x, y) ((x) < (y) ? (x) : (y))
-
-#define doubleToByte(color) (floor(1.0 <= color ? 255 : color * 256.0))
-#define byteToDouble(color) (color / 255.0)
 
 static void readBitmap(FILE* fp, BMPImage* image) {
     size_t err = 0;
@@ -44,7 +42,7 @@ static void readBitmap(FILE* fp, BMPImage* image) {
     if (err == 0) 
         throwErr("Error: reading info_header.width!");
     err = fread(&image->info_header.height, sizeof image->info_header.height, 1, fp);
-     if (err == 0) 
+    if (err == 0) 
         throwErr("Error: reading info_header.height!");
     err = fread(&image->info_header.planes, sizeof image->info_header.planes, 1, fp);
     if (err == 0) 
@@ -133,9 +131,23 @@ void writeBMPFile(const char* filename, const BMPImage* image) {
     writeBitmap(fp, image);
     writeData(fp, image);
 
-    free(image->data);
-
     fclose(fp);
+}
+
+void copyImage(BMPImage* dest, const BMPImage* src) {
+    if (dest == NULL)
+        throwErr("Error: dest null ptr!");
+    if (src == NULL)
+        throwErr("Error: src null ptr!");
+
+    dest->file_header = src->file_header;
+    dest->info_header = src->info_header;
+    
+    dest->data = (uint8_t*)malloc(sizeof(uint8_t) * dest->info_header.size_image);
+    if (dest->data == NULL)
+        throwErr("Error: dest data out of memmory!");
+
+    memcpy(dest->data, src->data, sizeof(uint8_t) * dest->info_header.size_image);
 }
 
 static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
@@ -146,7 +158,8 @@ static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
         if (y == 0) ++y;
         
         uint32_t row = 0 < image->info_header.height ? image->info_header.height - y - 1 : y;
-        uint32_t row_size = ((image->info_header.bits_count * image->info_header.width + IMAGE_BITNESS - 1) / IMAGE_BITNESS) * PIXEL_SIZE;
+        uint32_t row_size = ((image->info_header.bits_count * 
+                              image->info_header.width + IMAGE_BITNESS - 1) / IMAGE_BITNESS) * PIXEL_SIZE;
         uint32_t bits_per_pixel = image->info_header.bits_count / BYTE_SIZE;
 
         pixel_ptr = row * row_size + x * bits_per_pixel + image->data;
@@ -173,33 +186,32 @@ Pixel getPixel(BMPImage* image, uint32_t x, uint32_t y) {
     return (Pixel){pixel_ptr[2], pixel_ptr[1], pixel_ptr[0]};
 }
 
-void filtration(BMPImage* image, double* filter, uint8_t filter_r) {
-    double factor = 1.0;
-    double bias = 0.0;
-
+void filtration(BMPImage* image, Filter filter) {
     Pixel** new_pixels = (Pixel**)malloc(sizeof(Pixel*) * image->info_header.width);
     for (uint32_t i = 0; i != image->info_header.width; ++i)
         new_pixels[i] = (Pixel*)malloc(sizeof(Pixel) * image->info_header.height);
 
     for(uint32_t x = 0; x != image->info_header.width; ++x)
         for(uint32_t y = 0; y != image->info_header.height; ++y) {
-            double r = 0, g = 0, b = 0;
+            double r = 0;
+            double g = 0;
+            double b = 0;
 
-            for(uint8_t filter_x = 0; filter_x < filter_r; ++filter_x)
-                for(uint8_t filter_y = 0; filter_y < filter_r; ++filter_y) {
-                    uint32_t image_x = (x - filter_r / 2 + filter_x + image->info_header.width) % image->info_header.width;
-                    uint32_t image_y = (y - filter_r / 2 + filter_y + image->info_header.height) % image->info_header.height;
+            for(uint8_t filter_x = 0; filter_x < filter.r; ++filter_x)
+                for(uint8_t filter_y = 0; filter_y < filter.r; ++filter_y) {
+                    uint32_t image_x = (x - filter.r / 2 + filter_x + image->info_header.width) % image->info_header.width;
+                    uint32_t image_y = (y - filter.r / 2 + filter_y + image->info_header.height) % image->info_header.height;
 
                     Pixel pixel = getPixel(image, image_x, image_y);
 
-                    r += byteToDouble(pixel.r) * filterAccess(filter, filter_r, filter_x, filter_y);
-                    g += byteToDouble(pixel.g) * filterAccess(filter, filter_r, filter_x, filter_y);
-                    b += byteToDouble(pixel.b) * filterAccess(filter, filter_r, filter_x, filter_y);
+                    r += pixel.r * filterAccess(filter, filter_x, filter_y);
+                    g += pixel.g * filterAccess(filter, filter_x, filter_y);
+                    b += pixel.b * filterAccess(filter, filter_x, filter_y);
                 }
-
-            new_pixels[x][y].r = min(max(doubleToByte(factor * r + bias), 0), 255);
-            new_pixels[x][y].g = min(max(doubleToByte(factor * g + bias), 0), 255);
-            new_pixels[x][y].b = min(max(doubleToByte(factor * b + bias), 0), 255);  
+            
+            new_pixels[x][y].r = min(max((filter.factor * r + filter.bias), 0), 255);
+            new_pixels[x][y].g = min(max((filter.factor * g + filter.bias), 0), 255);
+            new_pixels[x][y].b = min(max((filter.factor * b + filter.bias), 0), 255);  
         }
 
     for(uint32_t x = 0; x != image->info_header.width; ++x)

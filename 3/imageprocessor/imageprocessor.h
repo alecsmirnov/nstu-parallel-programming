@@ -1,26 +1,7 @@
 #ifndef IMAGEPROCESSOR_H
 #define IMAGEPROCESSOR_H
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <math.h>
-
-#define merge(x, y) x##_##y
-
-#define filterCreate(type, array_ptr, r_ptr, ...) do {                                       \
-    static type merge(array_ptr, const)[] = __VA_ARGS__;                                     \
-    static uint16_t merge(array_ptr, size) = sizeof(merge(array_ptr, const)) / sizeof(type); \
-    array_ptr = malloc(merge(array_ptr, size) * sizeof(type));                               \
-    if (array_ptr == NULL)                                                                   \
-        fprintf(stderr, "Error: filter out of memmory!\n");                                  \
-    memcpy(array_ptr, merge(array_ptr, const), merge(array_ptr, size) * sizeof(type));       \
-    if (r_ptr == NULL)                                                                       \
-        fprintf(stderr, "Error: pass NULL ptr!\n");                                          \
-    *r_ptr = sqrt(merge(array_ptr, size));                                                   \
-} while (0)
-
-#define filterAccess(filter, filter_r, i, j) \
-    (filter[(i) * (filter_r) + (j)])
+#include "filter.h"
 
 typedef struct BitmapFileHeader {
     uint16_t type;   
@@ -60,9 +41,11 @@ typedef struct Pixel {
 void readBMPFile(const char* filename, BMPImage* image);
 void writeBMPFile(const char* filename, const BMPImage* image);
 
+void copyImage(BMPImage* dest, const BMPImage* src);
+
 void setPixel(BMPImage* image, uint32_t x, uint32_t y, Pixel pixel);
 Pixel getPixel(BMPImage* image, uint32_t x, uint32_t y);
 
-void filtration(BMPImage* image, double* filter, uint8_t filter_r);
+void filtration(BMPImage* image, Filter filter);
 
 #endif
