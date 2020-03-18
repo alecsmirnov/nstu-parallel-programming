@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 #include "imageprocessor.h"
 
 #define IMAGE_BITNESS 32 
@@ -20,12 +24,24 @@
 
 // Корректировка цвета фильтра после преобразований
 #define correctFilterColor(filter, color) \
-    (min(max((filter.factor * color + filter.bias), 0), BYTE_SIZE))
+    (min(max(((filter)->factor * color + (filter)->bias), 0), BYTE_SIZE))
+
+// Данные потока для обработки
+typedef struct Chunk {
+    Color** pixels;
+
+    uint32_t x0;
+    uint32_t x1;
+    uint32_t y0;
+    uint32_t y1;
+} Chunk;
 
 // Чтение заголовков файла
 static void readBitmap(FILE* fp, BMPImage* image) {
     size_t err = 0;
 
+    // Избегаем прагм упаковки структур и невозможности переноса.
+    // Читаем все данные, без чтения округлённого размера структур в памяти
     err = fread(&image->file_header.type, sizeof image->file_header.type, 1, fp);
     if (err == 0) 
         throwErr("Error: reading file_header.type!");
@@ -106,6 +122,8 @@ void readImage(const char* filename, BMPImage* image) {
 
 // Запись заголовков файла
 static void writeBitmap(FILE* fp, const BMPImage* image) {
+    // Избегаем прагм упаковки структур и невозможности переноса.
+    // Записываем все данные, без записи округлённого размера структур в памяти
     fwrite(&image->file_header.type, sizeof(uint8_t), sizeof image->file_header.type, fp);
     fwrite(&image->file_header.size, sizeof(uint8_t), sizeof image->file_header.size, fp);
     fwrite(&image->file_header.reserved1, sizeof(uint8_t), sizeof image->file_header.reserved1, fp);
@@ -184,7 +202,7 @@ static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
 void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL) 
-        throwErr("Error: abroad pixel image!");
+        throwErr("Error: pixel abroad when set!");
 
     pixel_ptr[0] = pixel.b;
     pixel_ptr[1] = pixel.g;
@@ -195,33 +213,22 @@ void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel) {
 Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL)
-        throwErr("Error: abroad pixel image!");
+        throwErr("Error: pixel abroad when get!");
 
     return (Color){pixel_ptr[2], pixel_ptr[1], pixel_ptr[0]};
 }
 
-// Фильтрация изображения
-void filterImage(BMPImage* image, Filter filter) {
-    // Инициализация пиксельного поля для преобразованного изображения
-    Color** new_pixels = (Color**)malloc(sizeof(Color*) * image->info_header.width);
-    if (new_pixels == NULL)
-        throwErr("Error: new_pixels out of memmory!");
-    for (uint32_t i = 0; i < image->info_header.width; ++i) {
-        new_pixels[i] = (Color*)malloc(sizeof(Color) * image->info_header.height);
-        if (new_pixels[i] == NULL)
-            throwErr("Error: new_pixels[i] out of memmory!");
-    }
-
+static void filterImageChunk(BMPImage* image, const Filter* filter, Chunk* chunk) {
     // Фильтрация всех пикселей изображения
-    for(uint32_t x = 0; x < image->info_header.width; ++x)
-        for(uint32_t y = 0; y < image->info_header.height; ++y) {
+    for(uint32_t x = chunk->x0; x < chunk->x1; ++x)
+        for(uint32_t y = chunk->y0; y < chunk->y1; ++y) {
             FilterColor filter_color = (FilterColor){0, 0, 0};
 
             // Применение матрицы фильтра к пикселю и его соседям
-            for(uint8_t filter_x = 0; filter_x < filter.r; ++filter_x)
-                for(uint8_t filter_y = 0; filter_y < filter.r; ++filter_y) {
-                    uint32_t image_x = (x - filter.r / 2 + filter_x + image->info_header.width) % image->info_header.width;
-                    uint32_t image_y = (y - filter.r / 2 + filter_y + image->info_header.height) % image->info_header.height;
+            for(uint8_t filter_x = 0; filter_x < filter->r; ++filter_x)
+                for(uint8_t filter_y = 0; filter_y < filter->r; ++filter_y) {
+                    uint32_t image_x = (x - filter->r / 2 + filter_x + image->info_header.width) % image->info_header.width;
+                    uint32_t image_y = (y - filter->r / 2 + filter_y + image->info_header.height) % image->info_header.height;
 
                     Color image_pixel = getPixelColor(image, image_x, image_y);
 
@@ -231,17 +238,72 @@ void filterImage(BMPImage* image, Filter filter) {
                 }
             
             // Сохранение преобразованного пикселя с выравниванием по размеру байта
-            new_pixels[x][y].r = correctFilterColor(filter, filter_color.r);
-            new_pixels[x][y].g = correctFilterColor(filter, filter_color.g);
-            new_pixels[x][y].b = correctFilterColor(filter, filter_color.b);
+            chunk->pixels[x][y].r = correctFilterColor(filter, filter_color.r);
+            chunk->pixels[x][y].g = correctFilterColor(filter, filter_color.g);
+            chunk->pixels[x][y].b = correctFilterColor(filter, filter_color.b);
         }
 
     // Замещение изображения на преобразованное
-    for(uint32_t x = 0; x < image->info_header.width; ++x)
-        for(uint32_t y = 0; y < image->info_header.height; ++y) 
-            setPixelColor(image, x, y, new_pixels[x][y]);
+    for(uint32_t x = chunk->x0; x < chunk->x1; ++x)
+        for(uint32_t y = chunk->y0; y < chunk->y1; ++y) 
+            setPixelColor(image, x, y, chunk->pixels[x][y]);
+}
 
-    for(uint32_t x = 0; x < image->info_header.width; ++x)
+// Фильтрация изображения
+void filterImage(BMPImage* image, const Filter* filter, uint8_t threads_count) {
+    #if defined(_OPENMP)
+    omp_set_dynamic(0);
+    omp_set_num_threads(threads_count);
+    #endif
+
+    // Инициализация пиксельного поля для преобразованного изображения
+    Color** new_pixels = (Color**)malloc(sizeof(Color*) * image->info_header.width);
+    if (new_pixels == NULL)
+        throwErr("Error: new_pixels out of memmory!");
+
+    #pragma omp parallel for
+    for (uint32_t i = 0; i < image->info_header.width; ++i) {
+        new_pixels[i] = (Color*)malloc(sizeof(Color) * image->info_header.height);
+        if (new_pixels[i] == NULL)
+            throwErr("Error: new_pixels[i] out of memmory!");
+    }
+
+    // Инициализация блоков данных
+    Chunk* chunks = (Chunk*)malloc(sizeof(Chunk) * threads_count);
+    if (new_pixels == NULL)
+        throwErr("Error: chunks out of memmory!");
+
+    uint32_t chunk_size = image->info_header.width / threads_count;
+    uint8_t remainder = image->info_header.height * image->info_header.width % threads_count;
+
+    // Определение размеров блоков данных
+    uint8_t shift = 0;
+    for (uint8_t i = 0; i < threads_count; ++i) {
+        uint8_t step = i < remainder ? 1 : 0;
+
+        chunks[i].pixels = new_pixels;
+        chunks[i].x0 = i * chunk_size + shift;
+        chunks[i].x1 = i * chunk_size + chunk_size + shift + step;
+        chunks[i].y0 = 0;
+        chunks[i].y1 = image->info_header.height;
+
+        shift += step;
+    }
+
+    #pragma omp parallel
+    {   
+        uint8_t thread_num = 0;
+
+        #if defined(_OPENMP)
+        thread_num = omp_get_thread_num();
+        #endif
+
+        filterImageChunk(image, filter, &chunks[thread_num]);
+    }
+
+    #pragma omp parallel for
+    for (uint32_t x = 0; x < image->info_header.width; ++x)
         free(new_pixels[x]);
     free(new_pixels);
+    free(chunks);
 }

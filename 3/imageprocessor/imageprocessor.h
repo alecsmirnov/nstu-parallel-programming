@@ -47,7 +47,7 @@ void writeImage(const char* filename, const BMPImage* image);
 // Копирование изображение
 void copyImage(BMPImage* image_dest, const BMPImage* image_src);
 // Фильтрация изображения
-void filterImage(BMPImage* image, Filter filter);
+void filterImage(BMPImage* image, const Filter* filter, uint8_t threads_count);
 
 // Доступ к отдельным пикселям изображения
 void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel);

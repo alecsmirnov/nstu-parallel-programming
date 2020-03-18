@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <math.h>
 
-// Создание прямоугольного сглаживающего фильтра
+// Создание прямоугольного сглаживающего фильтра (const double[])
 // Входные аргументы: коэффициент сглаживания, смещение, матрица фильтра
 #define filterCreate(factor_init, bias_init, ...) ({        \
     Filter filter;                                          \
@@ -19,7 +19,7 @@
 
 // Доступ к элементу квадратной матрицы фильтра
 #define filterAccess(filter, i, j) \
-    (filter.matrix[(i) * (filter.r) + (j)])
+    ((filter)->matrix[(i) * (filter)->r + (j)])
 
 // Цвет ячейки фильтра
 typedef struct FilterColor {
