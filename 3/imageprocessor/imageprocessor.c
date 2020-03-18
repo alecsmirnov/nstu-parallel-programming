@@ -7,8 +7,9 @@
 
 #define BYTE_SIZE  255
 #define BYTE_VALUE 8
-#define PIXEL_SIZE 4
+#define PIXEL_SIZE 4                // +1 байт для 32-х разрядного заголовка
 
+// Функция обработки ошибок
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
     exit(EXIT_FAILURE);             \
@@ -17,9 +18,11 @@
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
+// Корректировка цвета фильтра после преобразований
 #define correctFilterColor(filter, color) \
     (min(max((filter.factor * color + filter.bias), 0), BYTE_SIZE))
 
+// Чтение заголовков файла
 static void readBitmap(FILE* fp, BMPImage* image) {
     size_t err = 0;
 
@@ -74,6 +77,7 @@ static void readBitmap(FILE* fp, BMPImage* image) {
         throwErr("Error: reading info_header.color_important!");
 }
 
+// Чтение пиксельных данных
 static void readData(FILE* fp, BMPImage* image) {
     image->data = (uint8_t*)malloc(sizeof(uint8_t) * image->info_header.size_image);
     if (image->data == NULL)
@@ -85,6 +89,7 @@ static void readData(FILE* fp, BMPImage* image) {
         throwErr("Error: reading image->data!");
 }
 
+// Чтение изображения
 void readImage(const char* filename, BMPImage* image) {
     if (image == NULL)
         throwErr("Error: image null ptr!");
@@ -99,6 +104,7 @@ void readImage(const char* filename, BMPImage* image) {
     fclose(fp);
 }
 
+// Запись заголовков файла
 static void writeBitmap(FILE* fp, const BMPImage* image) {
     fwrite(&image->file_header.type, sizeof(uint8_t), sizeof image->file_header.type, fp);
     fwrite(&image->file_header.size, sizeof(uint8_t), sizeof image->file_header.size, fp);
@@ -119,11 +125,13 @@ static void writeBitmap(FILE* fp, const BMPImage* image) {
     fwrite(&image->info_header.color_important, sizeof(uint8_t), sizeof image->info_header.color_important, fp);
 }
 
+// Запись пиксельных данных
 static void writeData(FILE* fp, const BMPImage* image) {
     fseek(fp, sizeof(uint8_t) * image->file_header.offset_bits, SEEK_SET);
     fwrite(image->data, sizeof(uint8_t), image->info_header.size_image, fp);
 }
 
+// Запись изображения
 void writeImage(const char* filename, const BMPImage* image) {
     if (image == NULL)
         throwErr("Error: image null ptr!");
@@ -138,6 +146,7 @@ void writeImage(const char* filename, const BMPImage* image) {
     fclose(fp);
 }
 
+// Копирование изображения
 void copyImage(BMPImage* image_dest, const BMPImage* image_src) {
     if (image_dest == NULL)
         throwErr("Error: dest null ptr!");
@@ -154,9 +163,11 @@ void copyImage(BMPImage* image_dest, const BMPImage* image_src) {
     memcpy(image_dest->data, image_src->data, sizeof(uint8_t) * image_dest->info_header.size_image);
 }
 
+// Получить указатель пикселя из позиции в пиксельных данных
 static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
     uint8_t* pixel_ptr = NULL;
 
+    // Доступ к пикселю в пиксельных данных
     if (x < image->info_header.width && y < image->info_header.height) {       
         uint32_t row = 0 < image->info_header.height ? image->info_header.height - y - 1 : y;
         uint32_t row_size = ((image->info_header.bits_count * 
@@ -169,6 +180,7 @@ static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
     return pixel_ptr;
 }
 
+// Изменить цвет пикселя
 void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL) 
@@ -179,6 +191,7 @@ void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel) {
     pixel_ptr[2] = pixel.r;
 }
 
+// Получить цвет пикселя
 Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL)
@@ -187,7 +200,9 @@ Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y) {
     return (Color){pixel_ptr[2], pixel_ptr[1], pixel_ptr[0]};
 }
 
+// Фильтрация изображения
 void filterImage(BMPImage* image, Filter filter) {
+    // Инициализация пиксельного поля для преобразованного изображения
     Color** new_pixels = (Color**)malloc(sizeof(Color*) * image->info_header.width);
     if (new_pixels == NULL)
         throwErr("Error: new_pixels out of memmory!");
@@ -197,10 +212,12 @@ void filterImage(BMPImage* image, Filter filter) {
             throwErr("Error: new_pixels[i] out of memmory!");
     }
 
+    // Фильтрация всех пикселей изображения
     for(uint32_t x = 0; x < image->info_header.width; ++x)
         for(uint32_t y = 0; y < image->info_header.height; ++y) {
             FilterColor filter_color = (FilterColor){0, 0, 0};
 
+            // Применение матрицы фильтра к пикселю и его соседям
             for(uint8_t filter_x = 0; filter_x < filter.r; ++filter_x)
                 for(uint8_t filter_y = 0; filter_y < filter.r; ++filter_y) {
                     uint32_t image_x = (x - filter.r / 2 + filter_x + image->info_header.width) % image->info_header.width;
@@ -213,11 +230,13 @@ void filterImage(BMPImage* image, Filter filter) {
                     filter_color.b += image_pixel.b * filterAccess(filter, filter_x, filter_y);
                 }
             
+            // Сохранение преобразованного пикселя с выравниванием по размеру байта
             new_pixels[x][y].r = correctFilterColor(filter, filter_color.r);
             new_pixels[x][y].g = correctFilterColor(filter, filter_color.g);
             new_pixels[x][y].b = correctFilterColor(filter, filter_color.b);
         }
 
+    // Замещение изображения на преобразованное
     for(uint32_t x = 0; x < image->info_header.width; ++x)
         for(uint32_t y = 0; y < image->info_header.height; ++y) 
             setPixelColor(image, x, y, new_pixels[x][y]);

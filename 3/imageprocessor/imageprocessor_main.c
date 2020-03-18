@@ -13,8 +13,7 @@ int main(int argc, char* argv[]) {
     BMPImage embos_image;
     copyImage(&embos_image, &image);
 
-    Filter embos;
-    filterCreate(embos, 1, 128, {
+    Filter embos = filterCreate(1, 128, {
         -1, -1,  0,
         -1,  0,  1,
          0,  1,  1
@@ -29,8 +28,7 @@ int main(int argc, char* argv[]) {
     BMPImage blur_image;
     copyImage(&blur_image, &image);
 
-    Filter blur;
-    filterCreate(blur, 1.0 / 9.0, 0, {
+    Filter blur = filterCreate(1.0 / 9.0, 0, {
         1, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 1, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 1, 0, 0, 0, 0, 0, 0,
