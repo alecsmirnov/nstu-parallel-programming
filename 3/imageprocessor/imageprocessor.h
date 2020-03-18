@@ -3,6 +3,12 @@
 
 #include "filter.h"
 
+typedef struct Color {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} Color;
+
 typedef struct BitmapFileHeader {
     uint16_t type;   
     uint32_t size;
@@ -32,20 +38,13 @@ typedef struct BMPImage {
     uint8_t* data;
 } BMPImage;
 
-typedef struct Pixel {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-} Pixel;
+void readImage(const char* filename, BMPImage* image);
+void writeImage(const char* filename, const BMPImage* image);
 
-void readBMPFile(const char* filename, BMPImage* image);
-void writeBMPFile(const char* filename, const BMPImage* image);
+void copyImage(BMPImage* image_dest, const BMPImage* image_src);
+void filterImage(BMPImage* image, Filter filter);
 
-void copyImage(BMPImage* dest, const BMPImage* src);
-
-void setPixel(BMPImage* image, uint32_t x, uint32_t y, Pixel pixel);
-Pixel getPixel(BMPImage* image, uint32_t x, uint32_t y);
-
-void filtration(BMPImage* image, Filter filter);
+void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel);
+Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y);
 
 #endif

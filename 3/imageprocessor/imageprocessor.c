@@ -5,8 +5,9 @@
 
 #define IMAGE_BITNESS 32 
 
+#define BYTE_SIZE  255
+#define BYTE_VALUE 8
 #define PIXEL_SIZE 4
-#define BYTE_SIZE  8
 
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
@@ -15,6 +16,9 @@
 
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #define min(x, y) ((x) < (y) ? (x) : (y))
+
+#define correctFilterColor(filter, color) \
+    (min(max((filter.factor * color + filter.bias), 0), BYTE_SIZE))
 
 static void readBitmap(FILE* fp, BMPImage* image) {
     size_t err = 0;
@@ -81,7 +85,7 @@ static void readData(FILE* fp, BMPImage* image) {
         throwErr("Error: reading image->data!");
 }
 
-void readBMPFile(const char* filename, BMPImage* image) {
+void readImage(const char* filename, BMPImage* image) {
     if (image == NULL)
         throwErr("Error: image null ptr!");
 
@@ -120,7 +124,7 @@ static void writeData(FILE* fp, const BMPImage* image) {
     fwrite(image->data, sizeof(uint8_t), image->info_header.size_image, fp);
 }
 
-void writeBMPFile(const char* filename, const BMPImage* image) {
+void writeImage(const char* filename, const BMPImage* image) {
     if (image == NULL)
         throwErr("Error: image null ptr!");
 
@@ -134,33 +138,30 @@ void writeBMPFile(const char* filename, const BMPImage* image) {
     fclose(fp);
 }
 
-void copyImage(BMPImage* dest, const BMPImage* src) {
-    if (dest == NULL)
+void copyImage(BMPImage* image_dest, const BMPImage* image_src) {
+    if (image_dest == NULL)
         throwErr("Error: dest null ptr!");
-    if (src == NULL)
+    if (image_src == NULL)
         throwErr("Error: src null ptr!");
 
-    dest->file_header = src->file_header;
-    dest->info_header = src->info_header;
+    image_dest->file_header = image_src->file_header;
+    image_dest->info_header = image_src->info_header;
     
-    dest->data = (uint8_t*)malloc(sizeof(uint8_t) * dest->info_header.size_image);
-    if (dest->data == NULL)
+    image_dest->data = (uint8_t*)malloc(sizeof(uint8_t) * image_dest->info_header.size_image);
+    if (image_dest->data == NULL)
         throwErr("Error: dest data out of memmory!");
 
-    memcpy(dest->data, src->data, sizeof(uint8_t) * dest->info_header.size_image);
+    memcpy(image_dest->data, image_src->data, sizeof(uint8_t) * image_dest->info_header.size_image);
 }
 
 static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
     uint8_t* pixel_ptr = NULL;
 
-    if (x < image->info_header.width && y < image->info_header.height) {
-        if (x == 0) ++x;
-        if (y == 0) ++y;
-        
+    if (x < image->info_header.width && y < image->info_header.height) {       
         uint32_t row = 0 < image->info_header.height ? image->info_header.height - y - 1 : y;
         uint32_t row_size = ((image->info_header.bits_count * 
                               image->info_header.width + IMAGE_BITNESS - 1) / IMAGE_BITNESS) * PIXEL_SIZE;
-        uint32_t bits_per_pixel = image->info_header.bits_count / BYTE_SIZE;
+        uint32_t bits_per_pixel = image->info_header.bits_count / BYTE_VALUE;
 
         pixel_ptr = row * row_size + x * bits_per_pixel + image->data;
     }
@@ -168,7 +169,7 @@ static uint8_t* getPixelPtr(BMPImage* image, uint32_t x, uint32_t y) {
     return pixel_ptr;
 }
 
-void setPixel(BMPImage* image, uint32_t x, uint32_t y, Pixel pixel) {
+void setPixelColor(BMPImage* image, uint32_t x, uint32_t y, Color pixel) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL) 
         throwErr("Error: abroad pixel image!");
@@ -178,47 +179,50 @@ void setPixel(BMPImage* image, uint32_t x, uint32_t y, Pixel pixel) {
     pixel_ptr[2] = pixel.r;
 }
 
-Pixel getPixel(BMPImage* image, uint32_t x, uint32_t y) {
+Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y) {
     uint8_t* pixel_ptr = getPixelPtr(image, x, y);
     if (pixel_ptr == NULL)
         throwErr("Error: abroad pixel image!");
 
-    return (Pixel){pixel_ptr[2], pixel_ptr[1], pixel_ptr[0]};
+    return (Color){pixel_ptr[2], pixel_ptr[1], pixel_ptr[0]};
 }
 
-void filtration(BMPImage* image, Filter filter) {
-    Pixel** new_pixels = (Pixel**)malloc(sizeof(Pixel*) * image->info_header.width);
-    for (uint32_t i = 0; i != image->info_header.width; ++i)
-        new_pixels[i] = (Pixel*)malloc(sizeof(Pixel) * image->info_header.height);
+void filterImage(BMPImage* image, Filter filter) {
+    Color** new_pixels = (Color**)malloc(sizeof(Color*) * image->info_header.width);
+    if (new_pixels == NULL)
+        throwErr("Error: new_pixels out of memmory!");
+    for (uint32_t i = 0; i < image->info_header.width; ++i) {
+        new_pixels[i] = (Color*)malloc(sizeof(Color) * image->info_header.height);
+        if (new_pixels[i] == NULL)
+            throwErr("Error: new_pixels[i] out of memmory!");
+    }
 
-    for(uint32_t x = 0; x != image->info_header.width; ++x)
-        for(uint32_t y = 0; y != image->info_header.height; ++y) {
-            double r = 0;
-            double g = 0;
-            double b = 0;
+    for(uint32_t x = 0; x < image->info_header.width; ++x)
+        for(uint32_t y = 0; y < image->info_header.height; ++y) {
+            FilterColor filter_color = (FilterColor){0, 0, 0};
 
             for(uint8_t filter_x = 0; filter_x < filter.r; ++filter_x)
                 for(uint8_t filter_y = 0; filter_y < filter.r; ++filter_y) {
                     uint32_t image_x = (x - filter.r / 2 + filter_x + image->info_header.width) % image->info_header.width;
                     uint32_t image_y = (y - filter.r / 2 + filter_y + image->info_header.height) % image->info_header.height;
 
-                    Pixel pixel = getPixel(image, image_x, image_y);
+                    Color image_pixel = getPixelColor(image, image_x, image_y);
 
-                    r += pixel.r * filterAccess(filter, filter_x, filter_y);
-                    g += pixel.g * filterAccess(filter, filter_x, filter_y);
-                    b += pixel.b * filterAccess(filter, filter_x, filter_y);
+                    filter_color.r += image_pixel.r * filterAccess(filter, filter_x, filter_y);
+                    filter_color.g += image_pixel.g * filterAccess(filter, filter_x, filter_y);
+                    filter_color.b += image_pixel.b * filterAccess(filter, filter_x, filter_y);
                 }
             
-            new_pixels[x][y].r = min(max((filter.factor * r + filter.bias), 0), 255);
-            new_pixels[x][y].g = min(max((filter.factor * g + filter.bias), 0), 255);
-            new_pixels[x][y].b = min(max((filter.factor * b + filter.bias), 0), 255);  
+            new_pixels[x][y].r = correctFilterColor(filter, filter_color.r);
+            new_pixels[x][y].g = correctFilterColor(filter, filter_color.g);
+            new_pixels[x][y].b = correctFilterColor(filter, filter_color.b);
         }
 
-    for(uint32_t x = 0; x != image->info_header.width; ++x)
-        for(uint32_t y = 0; y != image->info_header.height; ++y) 
-            setPixel(image, x, y, new_pixels[x][y]);
+    for(uint32_t x = 0; x < image->info_header.width; ++x)
+        for(uint32_t y = 0; y < image->info_header.height; ++y) 
+            setPixelColor(image, x, y, new_pixels[x][y]);
 
-    for(uint32_t x = 0; x != image->info_header.width; ++x)
+    for(uint32_t x = 0; x < image->info_header.width; ++x)
         free(new_pixels[x]);
     free(new_pixels);
 }

@@ -5,18 +5,22 @@
 #include <stdint.h>
 #include <math.h>
 
-#define filterCreate(filter, ...) do {                                      \
-    static double filter_const[] = __VA_ARGS__;                             \
-    static uint16_t filter_size = sizeof(filter_const) / sizeof(double);    \
-    filter.data = malloc(filter_size * sizeof(double));                     \
-    if (filter.data == NULL)                                                \
-        fprintf(stderr, "Error: filter out of memmory!\n");                 \
-    memcpy(filter.data, filter_const, filter_size * sizeof(double));        \
-    filter.r = sqrt(filter_size);                                           \
+#define filterCreate(filter, factor_init, bias_init, ...) do {  \
+    static const double const_data[] = __VA_ARGS__;             \
+    filter.data = (double[]) __VA_ARGS__;                       \
+    filter.r = sqrt(sizeof(const_data) / sizeof(double));       \
+    filter.factor = factor_init;                                \
+    filter.bias = bias_init;                                    \
 } while (0)
 
 #define filterAccess(filter, i, j) \
     (filter.data[(i) * (filter.r) + (j)])
+
+typedef struct FilterColor {
+    double r;
+    double g;
+    double b;
+} FilterColor;
 
 typedef struct Filter {
     double* data;
