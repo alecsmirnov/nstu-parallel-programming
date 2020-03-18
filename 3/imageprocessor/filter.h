@@ -5,17 +5,23 @@
 #include <stdint.h>
 #include <math.h>
 
-#define filterCreate(filter, factor_init, bias_init, ...) do {  \
-    static const double const_data[] = __VA_ARGS__;             \
-    filter.data = (double[]) __VA_ARGS__;                       \
-    filter.r = sqrt(sizeof(const_data) / sizeof(double));       \
-    filter.factor = factor_init;                                \
-    filter.bias = bias_init;                                    \
-} while (0)
+// Создание прямоугольного сглаживающего фильтра
+// Входные аргументы: коэффициент сглаживания, смещение, матрица фильтра
+#define filterCreate(factor_init, bias_init, ...) ({        \
+    Filter filter;                                          \
+    static const double const_data[] = __VA_ARGS__;         \
+    filter.matrix = (double[]) __VA_ARGS__;                 \
+    filter.r = sqrt(sizeof(const_data) / sizeof(double));   \
+    filter.factor = factor_init;                            \
+    filter.bias = bias_init;                                \
+    filter;                                                 \
+})
 
+// Доступ к элементу квадратной матрицы фильтра
 #define filterAccess(filter, i, j) \
-    (filter.data[(i) * (filter.r) + (j)])
+    (filter.matrix[(i) * (filter.r) + (j)])
 
+// Цвет ячейки фильтра
 typedef struct FilterColor {
     double r;
     double g;
@@ -23,11 +29,11 @@ typedef struct FilterColor {
 } FilterColor;
 
 typedef struct Filter {
-    double* data;
-    uint8_t r;
+    double* matrix;         // Квадратная матрица фильтра
+    uint8_t r;              // Радиус
 
-    double factor;
-    double bias;
+    double factor;          // Коэффициент сглаживания
+    double bias;            // Смещение
 } Filter;
 
 #endif
