@@ -274,7 +274,7 @@ void filterImage(BMPImage* image, const Filter* filter, uint8_t threads_count) {
         throwErr("Error: chunks out of memmory!");
 
     uint32_t chunk_size = image->info_header.width / threads_count;
-    uint8_t remainder = image->info_header.height * image->info_header.width % threads_count;
+    uint8_t remainder = image->info_header.width % threads_count;
 
     // Определение размеров блоков данных
     uint8_t shift = 0;

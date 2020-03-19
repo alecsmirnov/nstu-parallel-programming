@@ -5,6 +5,13 @@
 #include "imageprocessor.h"
 
 #define DEMO_ARGS_COUNT 4
+#define TEST_ARGS_COUNT 4
+
+#define TEST_RESULT_FILENAME "result.txt"
+#define TEST_SIZE 4
+
+static const char* TEST_FOLDER = "test_images/";
+static const char* TEST_FILENAMES[TEST_SIZE] = {"2k.bmp", "4k.bmp", "5k.bmp", "8k.bmp"};
 
 // Пресеты фильтров
 typedef enum FilterNum {
@@ -82,9 +89,18 @@ static Filter getFilter(uint8_t filter_num) {
     return filter;
 }
 
+static char* makeTestFilename(const char* folder, const char* filename) {
+    size_t result_size = strlen(filename) + strlen(folder) + 1;
+    char* result_filename = (char*)malloc(sizeof(char*) * result_size);
+
+    snprintf(result_filename, sizeof(char) * result_size, "%s%s", folder, filename);
+
+    return result_filename;
+}
+
 // Формирование результирующего названия файла по названию и суффиксу
 static char* makeResultFilename(const char* filename, const char* suffix) {
-    size_t result_size = strlen(filename) + strlen(suffix);
+    size_t result_size = strlen(filename) + strlen(suffix) + 1;
     char* result_filename = (char*)malloc(sizeof(char*) * result_size);
 
     strncpy(result_filename, filename, strlen(filename) - 4);
@@ -95,7 +111,7 @@ static char* makeResultFilename(const char* filename, const char* suffix) {
     return result_filename;
 }
 
-char* getResultFilename(const char* filename, uint8_t filter_num) {
+static char* getResultFilename(const char* filename, uint8_t filter_num) {
     char* result_filename = NULL;
 
     switch (filter_num) {
@@ -150,8 +166,70 @@ static void demonstration(int argc, char* argv[]) {
     free(image.data);
 }
 
+static void test(int argc, char* argv[]) {
+	if (argc < TEST_ARGS_COUNT) {
+		fprintf(stderr, "Wrong number of arguments!\n");
+		fprintf(stderr, "Enter: <filter num> <threads count> <measure count>\n");
+        fprintf(stderr, "(Filter number: 0 - embos, 1 - edges, 2 - sharpen, 3 - blur)\n");
+		exit(EXIT_FAILURE);
+	}
+
+    uint8_t filter_num = atoi(argv[1]);
+	uint8_t threads_count = atoi(argv[2]);
+	uint8_t measure_count = atoi(argv[3]);
+
+	FILE* fp = fopen(TEST_RESULT_FILENAME, "w");
+
+	printf("Program execution...\n");
+	fprintf(fp, "size:\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
+
+    Filter filter = getFilter(filter_num);
+	for (uint8_t test_num = 0; test_num != TEST_SIZE; ++test_num) {
+        char* test_name = makeTestFilename(TEST_FOLDER, TEST_FILENAMES[test_num]);
+
+        BMPImage image;
+        readImage(test_name, &image);
+
+		fprintf(fp, "%u x %u\t", image.info_header.width, image.info_header.height);
+
+		for (uint8_t i = 0; i != threads_count; ++i) {
+			double elapsed_time = 0;
+			
+			for (uint8_t j = 0; j != measure_count; ++j) {
+                BMPImage test_image;
+                copyImage(&test_image, &image);
+
+                double start = omp_get_wtime();
+                filterImage(&test_image, &filter, i + 1);
+                double stop = omp_get_wtime();
+
+                elapsed_time += stop - start;
+
+                free(test_image.data);
+			}
+
+			fprintf(fp, "%lf\t", elapsed_time / measure_count);
+		}
+
+        free(test_name);
+        free(image.data);
+
+        printf("Test %hhu complete\n", test_num + 1);
+		fprintf(fp, "\n");
+	}
+
+    free(filter.matrix);
+    
+	printf("Done.\n");
+	fclose(fp);
+}
+
 int main(int argc, char* argv[]) {
-    demonstration(argc, argv);
+    #ifdef TEST 
+	test(argc, argv);
+	#else 
+	demonstration(argc, argv);
+	#endif
 
     return 0;
 }
