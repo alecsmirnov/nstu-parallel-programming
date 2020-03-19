@@ -36,6 +36,7 @@ int main(int argc, char* argv[]) {
         // Каждый поток суммирует элементы
         // своей части массива
         #ifdef CRITICAL
+            // Для демонстрации частичной суммы потока
             int private_sum = 0;
             for(int i = start; i < end; i++)
                 private_sum += a[i];

@@ -10,15 +10,15 @@
 #define TEST_RESULT_FILENAME "result.txt"
 #define TEST_SIZE 4
 
-static const char* TEST_FOLDER = "test_images/";
+static const char* TEST_FOLDER = "images/test_images/";
 static const char* TEST_FILENAMES[TEST_SIZE] = {"2k.bmp", "4k.bmp", "5k.bmp", "8k.bmp"};
 
 // Пресеты фильтров
 typedef enum FilterNum {
-    EMBOS,
-    SHARPEN,
-    EDGES,
-    BLUR,
+    EMBOS,                  // Рельеф
+    SHARPEN,                // Очертания
+    EDGES,                  // Резкость
+    BLUR,                   // Размытие
     FILTERNUM_SIZE
 } FilterNum;
 
@@ -82,7 +82,7 @@ static Filter getFilter(uint8_t filter_num) {
     filter.matrix = (double*)malloc(sizeof(double) * filter.r * filter.r);
     if (filter.matrix == NULL) {
         fprintf(stderr, "Error: filter.matrix out of memmory!\n");
-		exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
     memcpy(filter.matrix, const_filter.matrix, sizeof(double) * filter.r * filter.r);
 
@@ -127,11 +127,11 @@ static char* getResultFilename(const char* filename, uint8_t filter_num) {
 
 static void demonstration(int argc, char* argv[]) {
     if (argc < DEMO_ARGS_COUNT) {
-		fprintf(stderr, "Wrong number of arguments!\n");
-		fprintf(stderr, "Enter: <filename> <filter number> <threads count>\n");
+        fprintf(stderr, "Wrong number of arguments!\n");
+        fprintf(stderr, "Enter: <filename> <filter number> <threads count>\n");
         fprintf(stderr, "(Filter number: 0 - embos, 1 - edges, 2 - sharpen, 3 - blur)\n");
-		exit(EXIT_FAILURE);
-	}
+        exit(EXIT_FAILURE);
+    }
 
     const char* filename = argv[1];
     uint8_t filter_num = atoi(argv[2]);
@@ -159,7 +159,7 @@ static void demonstration(int argc, char* argv[]) {
 
     writeImage(result_filename, &image);
 
-    printf("\nElapdes time: %lf\n", stop - start);
+    printf("\nElapsed time: %lf\n", stop - start);
     
     free(result_filename);
     free(filter.matrix);
@@ -167,35 +167,35 @@ static void demonstration(int argc, char* argv[]) {
 }
 
 static void test(int argc, char* argv[]) {
-	if (argc < TEST_ARGS_COUNT) {
-		fprintf(stderr, "Wrong number of arguments!\n");
-		fprintf(stderr, "Enter: <filter num> <threads count> <measure count>\n");
+    if (argc < TEST_ARGS_COUNT) {
+        fprintf(stderr, "Wrong number of arguments!\n");
+        fprintf(stderr, "Enter: <filter num> <threads count> <measure count>\n");
         fprintf(stderr, "(Filter number: 0 - embos, 1 - edges, 2 - sharpen, 3 - blur)\n");
-		exit(EXIT_FAILURE);
-	}
+        exit(EXIT_FAILURE);
+    }
 
     uint8_t filter_num = atoi(argv[1]);
-	uint8_t threads_count = atoi(argv[2]);
-	uint8_t measure_count = atoi(argv[3]);
+    uint8_t threads_count = atoi(argv[2]);
+    uint8_t measure_count = atoi(argv[3]);
 
-	FILE* fp = fopen(TEST_RESULT_FILENAME, "w");
+    FILE* fp = fopen(TEST_RESULT_FILENAME, "w");
 
-	printf("Program execution...\n");
-	fprintf(fp, "size:\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
+    printf("Program execution...\n");
+    fprintf(fp, "size:\tthreads: 1\tthreads: 2\tthreads: 3\tthreads: 4\n");
 
     Filter filter = getFilter(filter_num);
-	for (uint8_t test_num = 0; test_num != TEST_SIZE; ++test_num) {
+    for (uint8_t test_num = 0; test_num != TEST_SIZE; ++test_num) {
         char* test_name = makeTestFilename(TEST_FOLDER, TEST_FILENAMES[test_num]);
 
         BMPImage image;
         readImage(test_name, &image);
 
-		fprintf(fp, "%u x %u\t", image.info_header.width, image.info_header.height);
+        fprintf(fp, "%u x %u\t", image.info_header.width, image.info_header.height);
 
-		for (uint8_t i = 0; i != threads_count; ++i) {
-			double elapsed_time = 0;
+        for (uint8_t i = 0; i != threads_count; ++i) {
+            double elapsed_time = 0;
 			
-			for (uint8_t j = 0; j != measure_count; ++j) {
+            for (uint8_t j = 0; j != measure_count; ++j) {
                 BMPImage test_image;
                 copyImage(&test_image, &image);
 
@@ -206,30 +206,30 @@ static void test(int argc, char* argv[]) {
                 elapsed_time += stop - start;
 
                 free(test_image.data);
-			}
+            }
 
-			fprintf(fp, "%lf\t", elapsed_time / measure_count);
-		}
+            fprintf(fp, "%lf\t", elapsed_time / measure_count);
+        }
 
         free(test_name);
         free(image.data);
 
         printf("Test %hhu complete\n", test_num + 1);
-		fprintf(fp, "\n");
-	}
+        fprintf(fp, "\n");
+    }
 
     free(filter.matrix);
     
-	printf("Done.\n");
-	fclose(fp);
+    printf("Done.\n");
+    fclose(fp);
 }
 
 int main(int argc, char* argv[]) {
     #ifdef TEST 
-	test(argc, argv);
-	#else 
-	demonstration(argc, argv);
-	#endif
+    test(argc, argv);
+    #else 
+    demonstration(argc, argv);
+    #endif
 
     return 0;
 }
