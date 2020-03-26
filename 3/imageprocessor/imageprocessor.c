@@ -220,13 +220,13 @@ Color getPixelColor(BMPImage* image, uint32_t x, uint32_t y) {
 
 static void filterImageChunk(BMPImage* image, const Filter* filter, Chunk* chunk) {
     // Фильтрация всех пикселей изображения
-    for(uint32_t x = chunk->x0; x < chunk->x1; ++x)
-        for(uint32_t y = chunk->y0; y < chunk->y1; ++y) {
+    for (uint32_t x = chunk->x0; x < chunk->x1; ++x)
+        for (uint32_t y = chunk->y0; y < chunk->y1; ++y) {
             FilterColor filter_color = (FilterColor){0, 0, 0};
 
             // Применение матрицы фильтра к пикселю и его соседям
-            for(uint8_t filter_x = 0; filter_x < filter->r; ++filter_x)
-                for(uint8_t filter_y = 0; filter_y < filter->r; ++filter_y) {
+            for (uint8_t filter_x = 0; filter_x < filter->r; ++filter_x)
+                for (uint8_t filter_y = 0; filter_y < filter->r; ++filter_y) {
                     uint32_t image_x = (x - filter->r / 2 + filter_x + image->info_header.width) % image->info_header.width;
                     uint32_t image_y = (y - filter->r / 2 + filter_y + image->info_header.height) % image->info_header.height;
 
@@ -244,8 +244,8 @@ static void filterImageChunk(BMPImage* image, const Filter* filter, Chunk* chunk
         }
 
     // Замещение изображения на преобразованное
-    for(uint32_t x = chunk->x0; x < chunk->x1; ++x)
-        for(uint32_t y = chunk->y0; y < chunk->y1; ++y) 
+    for (uint32_t x = chunk->x0; x < chunk->x1; ++x)
+        for (uint32_t y = chunk->y0; y < chunk->y1; ++y) 
             setPixelColor(image, x, y, chunk->pixels[x][y]);
 }
 
