@@ -55,7 +55,7 @@ static double jacobi(double* grid, Point size, Point h, size_t i, size_t j, size
            (2 / hx2 + 2 / hy2 + 2 / hz2 + ALPHA);
 }
 
-double* calculateEquation(Point size, Point h) {
+double calculateEquation(Point size, Point h) {
     double* grid = (double*)malloc(sizeof(double) * size.x * size.y * size.z);
     if (grid == NULL) 
         throwErr("Error: grid out of memmory!");
@@ -83,7 +83,8 @@ double* calculateEquation(Point size, Point h) {
         ++iters;
     } while (EPS < jacobi_res && iters < ITERS_MAX);
 
+    free(grid);
     free(new_grid);
 
-    return grid;
+    return jacobi_res;
 }

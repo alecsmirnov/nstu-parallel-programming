@@ -9,9 +9,9 @@ int main(int argc, char* argv[]) {
     Point N = (Point){size, size, size};
     Point h = (Point){D.x / (N.x - 1), D.y / (N.y - 1), D.y / (N.y - 1)};
 
-    double* res = calculateEquation(D, h);
+    double res = calculateEquation(D, h);
 
-    free(res);
+    printf("Result: %lf\n", res);
 
     return 0;
 }

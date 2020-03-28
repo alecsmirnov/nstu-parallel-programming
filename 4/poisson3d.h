@@ -20,6 +20,6 @@ typedef struct Point {
     size_t z;
 } Point;
 
-double* calculateEquation(Point size, Point h);
+double calculateEquation(Point size, Point h);
 
 #endif
