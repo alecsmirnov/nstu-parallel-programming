@@ -19,9 +19,6 @@
 #define phi(x, y, z) \
     ((x) * (x) + (y) * (y) + (z) * (z))
 
-#define rho(grid, D, i, j, k) \
-    (6 - ALPHA * gridAccess(grid, D, i, j, k))
-
 static bool isBoundary(Point D, size_t i, size_t j, size_t k) {
     return i == 0 || i == D.x - 1 || 
            j == 0 || j == D.y - 1 || 
@@ -29,17 +26,17 @@ static bool isBoundary(Point D, size_t i, size_t j, size_t k) {
 }
 
 static void setBoundary(Grid* grid) {
-    for (size_t i = grid->p0.x; i * grid->h.x != grid->D.x; ++i)
-        for (size_t j = grid->p0.y; j * grid->h.y != grid->D.y; ++j)
-            for (size_t k = grid->p0.z; k * grid->h.z != grid->D.z; ++k) {
+    for (size_t i = 0; i != grid->D.x; ++i)
+        for (size_t j = 0; j != grid->D.y; ++j)
+            for (size_t k = 0; k != grid->D.z; ++k) {
                 double x = 0;
                 double y = 0;
                 double z = 0;
 
                 if (isBoundary(grid->D, i, j, k)) {
-                    x = i;
-                    y = j;
-                    z = k;
+                    x = grid->p0.x + i * grid->h.x;
+                    y = grid->p0.y + j * grid->h.y;
+                    z = grid->p0.z + k * grid->h.z;
                 }
 
                 gridAccess(grid->data, grid->D, i, j, k) = phi(x, y, z);
@@ -58,11 +55,11 @@ static double jacobi(Grid* grid, size_t i, size_t j, size_t k) {
     double phiz = (gridAccess(grid->data, grid->D, i, j, k - 1) + 
                    gridAccess(grid->data, grid->D, i, j, k + 1)) / hz2;
 
-    return (phix + phiy + phiz - rho(grid->data, grid->D, i, j, k)) / 
+    return (phix + phiy + phiz - 6 - ALPHA * gridAccess(grid->data, grid->D, i, j, k)) / 
            (2 / hx2 + 2 / hy2 + 2 / hz2 + ALPHA);
 }
 
-void gridInit(Grid* grid, Point D, Point N, Point p0) {
+void gridInit(Grid* grid, Point D, Point N, DPoint p0) {
     if (grid == NULL)
         throwErr("Error: grid null ptr!");
 
@@ -72,7 +69,9 @@ void gridInit(Grid* grid, Point D, Point N, Point p0) {
 
     grid->D = D;
     grid->N = N;
-    grid->h = (Point){D.x / (N.x - 1), D.y / (N.y - 1), D.y / (N.y - 1)};
+    grid->h = (DPoint){1.0 * D.x / (N.x - 1), 
+                       1.0 * D.y / (N.y - 1), 
+                       1.0 * D.y / (N.y - 1)};
     grid->p0 = p0;
 }
 
@@ -88,9 +87,9 @@ P3DResult solveEquation(Grid* grid) {
     size_t iters = 0;
 
     do {
-        for (size_t i = 1 + grid->p0.x; i * grid->h.x != grid->D.x - 1; ++i)
-            for (size_t j = 1 + grid->p0.y; j * grid->h.y != grid->D.y - 1; ++j)
-                for (size_t k = 1 + grid->p0.z; k * grid->h.z != grid->D.z - 1; ++k) {
+        for (size_t i = 1; i != grid->D.x - 1; ++i)
+            for (size_t j = 1; j != grid->D.y - 1; ++j)
+                for (size_t k = 1; k != grid->D.z - 1; ++k) {
                     gridAccess(new_data, grid->D, i, j, k) = jacobi(grid, i, j, k);
 
                     result = max(result, fabs(gridAccess(grid->data, grid->D, i, j, k) - 

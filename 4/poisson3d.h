@@ -14,14 +14,20 @@ typedef struct Point {
     size_t z;
 } Point;
 
+typedef struct DPoint {
+    double x;
+    double y;
+    double z;
+} DPoint;
+
 typedef struct Grid {
     double* data;
 
     Point D;
     Point N;
-    Point h;
 
-    Point p0;
+    DPoint h;
+    DPoint p0;
 } Grid;
 
 typedef struct P3DResult {
@@ -29,7 +35,7 @@ typedef struct P3DResult {
     size_t iters;
 } P3DResult;
 
-void gridInit(Grid* grid, Point D, Point N, Point p0);
+void gridInit(Grid* grid, Point D, Point N, DPoint p0);
 
 P3DResult solveEquation(Grid* grid);
 

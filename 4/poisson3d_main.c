@@ -7,7 +7,7 @@ int main(int argc, char* argv[]) {
 
     Point D = (Point){size, size, size};
     Point N = (Point){size, size, size};
-    Point p0 = (Point){0, 0, 0};
+    DPoint p0 = (DPoint){0, 0, 0};
 
     Grid grid;
     gridInit(&grid, D, N, p0);
