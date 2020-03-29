@@ -3,15 +3,21 @@
 #include "poisson3d.h"
 
 int main(int argc, char* argv[]) {
-    size_t size = 100;
+    size_t size = 4;
 
     Point D = (Point){size, size, size};
     Point N = (Point){size, size, size};
-    Point h = (Point){D.x / (N.x - 1), D.y / (N.y - 1), D.y / (N.y - 1)};
+    Point p0 = (Point){0, 0, 0};
 
-    double res = calculateEquation(D, h);
+    Grid grid;
+    gridInit(&grid, D, N, p0);
 
-    printf("Result: %lf\n", res);
+    P3DResult res = solveEquation(&grid);
+
+    printf("Result: %lf\n", res.result);
+    printf("Iters:  %zu\n", res.iters);
+
+    free(grid.data);
 
     return 0;
 }

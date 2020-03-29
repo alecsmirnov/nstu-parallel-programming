@@ -8,18 +8,29 @@
 
 #define ITERS_MAX 100
 
-#define phi(x, y, z) \
-    ((x) * (x) + (y) * (y) + (z) * (z))
-
-#define rho(x, y, z) \
-    (6 - ALPHA * phi(x, y, z))
-
 typedef struct Point {
     size_t x;
     size_t y;
     size_t z;
 } Point;
 
-double calculateEquation(Point size, Point h);
+typedef struct Grid {
+    double* data;
+
+    Point D;
+    Point N;
+    Point h;
+
+    Point p0;
+} Grid;
+
+typedef struct P3DResult {
+    double result;
+    size_t iters;
+} P3DResult;
+
+void gridInit(Grid* grid, Point D, Point N, Point p0);
+
+P3DResult solveEquation(Grid* grid);
 
 #endif
