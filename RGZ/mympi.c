@@ -9,6 +9,8 @@
 
 #define MPI_ARGS_COUNT 5
 
+#define DEFAULT_CLIENT_COUNT 128
+
 #define SOCK_ERR -1
 #define SOCK_PASS 0
 
@@ -69,7 +71,7 @@ void myMPICommSize(int* num_procs) {
     *num_procs = mpi_common.num_procs;
 }
 
-void myMPISend(void* data, size_t count, size_t datatype, uint8_t dest) {
+void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
     int err = 0;
 
     int send_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -79,16 +81,24 @@ void myMPISend(void* data, size_t count, size_t datatype, uint8_t dest) {
     struct sockaddr_in send_addr = mpi_common.serv_addr;    
     send_addr.sin_port = htons(mpi_common.port + dest);
 
-    while (connect(send_sock, (struct sockaddr*) &send_addr, sizeof(send_addr)) != SOCK_PASS);
+    while (connect(send_sock, (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
 
-    err = send(send_sock, data, count * datatype, 0);
+    int send_rank = 0;
+    myMPICommRank(&send_rank);
+    MyMPIData mpi_data = (MyMPIData){(MyMPIDataHeader){send_rank, tag, count, datatype}, data};
+
+    err = write(send_sock, &mpi_data.header, sizeof(MyMPIDataHeader));
+    if (err == SOCK_ERR)
+        throwErr("Error: send data header to dest!"); 
+
+    err = write(send_sock, mpi_data.data, count * datatype);
     if (err == SOCK_ERR)
         throwErr("Error: send data to dest!"); 
 
     close(send_sock);
 }
 
-void myMPIRecv(void* data, size_t count, size_t datatype, uint8_t src) {
+void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
     int err = 0;
 
     struct sockaddr_in recv_addr;
@@ -96,9 +106,25 @@ void myMPIRecv(void* data, size_t count, size_t datatype, uint8_t src) {
 
     int recv_sock = accept(mpi_common.serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
 
-    err = read(recv_sock, data, count * datatype);
-    if (err == SOCK_ERR)
-        throwErr("Error: recv data from src!"); 
+    MyMPIData mpi_data;
+    mpi_data.data = malloc(count * datatype);
+
+    do {
+        err = read(recv_sock, &mpi_data.header, sizeof(MyMPIDataHeader));
+        if (err == SOCK_ERR)
+            throwErr("Error: recv data header from src!"); 
+
+        err = read(recv_sock, mpi_data.data, count * datatype);
+        if (err == SOCK_ERR)
+            throwErr("Error: recv data from src!"); 
+    } while (mpi_data.header.rank != src && mpi_data.header.tag != tag);
+
+    memcpy(data, mpi_data.data, count * datatype);
+    free(mpi_data.data);
 
     close(recv_sock);
+}
+
+void myMPIBarrier() {
+
 }
