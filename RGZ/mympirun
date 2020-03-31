@@ -1,0 +1,48 @@
+#!/bin/bash
+
+HOSTNAME="$1"
+PORT="$2"
+PROGNAME="$3"
+PROCS_COUNT="$4"
+
+CORRECT=0
+NO_ARG_ERR=1
+FILE_TYPE_ERR=2
+
+function inputCheckStatus {
+    local status=$CORRECT;
+
+    if [ -z "$HOSTNAME" ] || [ -z "$PORT" ] || [ -z "$PROGNAME" ] || [ -z "$PROCS_COUNT" ]; then
+        status=$NO_ARG_ERR
+    else
+        if [ ! -x "$PROGNAME" ]; then
+            status=$FILE_TYPE_ERR
+        fi
+    fi
+
+    echo "$status"
+}
+
+function printErrorByStatus {
+    err_code="$1"
+
+    >&2 echo -n "Error: "
+    case $err_code in 
+        $NO_ARG_ERR) >&2 echo "arguments not specified!";;
+        $FILE_TYPE_ERR) >&2 echo "the file is not executable!";;
+    esac
+}
+
+function execProcesses {
+    for (( rank=0; rank < PROCS_COUNT; ++rank )); do
+	    ./$PROGNAME $HOSTNAME $PORT $rank $PROCS_COUNT &
+    done  
+}
+
+input_status=$(inputCheckStatus)
+
+if [ "$input_status" -eq "$CORRECT" ]; then
+    execProcesses
+else 
+    $(printErrorByStatus "$input_status")
+fi
