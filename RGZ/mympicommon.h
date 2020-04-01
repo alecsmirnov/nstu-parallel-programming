@@ -5,6 +5,13 @@
 #include <stdint.h>
 #include <netinet/in.h>
 
+#define ROOT 0
+
+typedef enum MyMPIMsgType {
+    MMT_MSG,
+    MMT_BLOCK
+} MyMPIMsgType;
+
 struct MyMPICommon {
     struct sockaddr_in serv_addr;
     int serv_sock;
@@ -13,12 +20,16 @@ struct MyMPICommon {
     uint16_t port;
 
     int rank;
-    int num_procs;
+    int size;
+
+    int block_size;
 } mpi_common;
 
 typedef struct MyMPIDataHeader {
     int src;
     int tag;
+
+    MyMPIMsgType msg_type;
 } MyMPIDataHeader;
 
 #endif

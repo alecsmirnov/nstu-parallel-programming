@@ -6,15 +6,17 @@
 
 int main(int argc, char* argv[]) {
     int rank;
-    int num_procs;
+    int size;
 
     myMPIInit(&argc, &argv);
 
     myMPICommRank(&rank);
-    myMPICommSize(&num_procs);
+    myMPICommSize(&size);
+
+    myMPIBarrier();
 
     //printf("%d of %d\n", rank, num_procs);
-
+    
     size_t data_size = 12;
     char* data = (char*)malloc(sizeof(char)* data_size);
     
@@ -43,7 +45,9 @@ int main(int argc, char* argv[]) {
 
     free(data);
     
-    //myMPIFinalize();
+    myMPIBarrier();
+    
+    myMPIFinalize();
 
     return 0;
 }
