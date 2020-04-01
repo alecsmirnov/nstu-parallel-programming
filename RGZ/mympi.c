@@ -7,6 +7,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include <fcntl.h>
+#include <errno.h>
+
 #define MPI_ARGS_COUNT 5
 
 #define DEFAULT_CLIENT_COUNT 128
@@ -18,6 +21,34 @@
     fprintf(stderr, "%s\n", msg);   \
     exit(EXIT_FAILURE);             \
 } while (0)
+
+static void dataSend(int sock, void* data, size_t data_size) {
+    const char* data_ptr = (const char*)data;
+
+    size_t send_size = 0;
+    while (send_size < data_size) {
+        int bytes_send = send(sock, data_ptr, data_size, 0);
+        if (bytes_send == SOCK_ERR)
+            throwErr("Error: send data header to dest!"); 
+
+        data_ptr += bytes_send;
+        send_size += bytes_send;
+    }
+}
+
+static void dataRecv(int sock, void* data, size_t data_size) {
+    char *data_ptr = (char*)data;
+
+    size_t recv_size = 0;
+    while (recv_size < data_size) {
+        int bytes_recv = recv(sock, data_ptr, data_size, 0);
+        if (bytes_recv== SOCK_ERR)
+            throwErr("Error: recv data from src!");
+
+        data_ptr += bytes_recv;
+        recv_size += bytes_recv;
+    }
+}
 
 void myMPIInit(int* argc, char** argv[]) {
     if (*argc < MPI_ARGS_COUNT) 
@@ -54,6 +85,8 @@ void myMPIInit(int* argc, char** argv[]) {
 }
 
 void myMPIFinalize() {
+    myMPIBarrier();
+
     close(mpi_common.serv_sock);
 }
 
@@ -83,17 +116,12 @@ void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
 
     while (connect(send_sock, (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
 
-    int send_rank = 0;
-    myMPICommRank(&send_rank);
-    MyMPIData mpi_data = (MyMPIData){(MyMPIDataHeader){send_rank, tag, count, datatype}, data};
+    int src = 0;
+    myMPICommRank(&src);
+    MyMPIDataHeader data_header = (MyMPIDataHeader){src, tag};
 
-    err = write(send_sock, &mpi_data.header, sizeof(MyMPIDataHeader));
-    if (err == SOCK_ERR)
-        throwErr("Error: send data header to dest!"); 
-
-    err = write(send_sock, mpi_data.data, count * datatype);
-    if (err == SOCK_ERR)
-        throwErr("Error: send data to dest!"); 
+    dataSend(send_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
+    dataSend(send_sock, data, count * datatype);
 
     close(send_sock);
 }
@@ -104,23 +132,19 @@ void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
     struct sockaddr_in recv_addr;
     socklen_t recv_len = sizeof(recv_addr);
 
-    int recv_sock = accept(mpi_common.serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
+    MyMPIDataHeader data_header;
+    void* recv_data = malloc(count * datatype);
 
-    MyMPIData mpi_data;
-    mpi_data.data = malloc(count * datatype);
-
+    int recv_sock = 0;
     do {
-        err = read(recv_sock, &mpi_data.header, sizeof(MyMPIDataHeader));
-        if (err == SOCK_ERR)
-            throwErr("Error: recv data header from src!"); 
+        recv_sock = accept(mpi_common.serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
 
-        err = read(recv_sock, mpi_data.data, count * datatype);
-        if (err == SOCK_ERR)
-            throwErr("Error: recv data from src!"); 
-    } while (mpi_data.header.rank != src && mpi_data.header.tag != tag);
+        dataRecv(recv_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
+        dataRecv(recv_sock, recv_data, count * datatype);
+    } while (data_header.src != src || data_header.tag != tag);
 
-    memcpy(data, mpi_data.data, count * datatype);
-    free(mpi_data.data);
+    memcpy(data, recv_data, count * datatype);
+    free(recv_data);
 
     close(recv_sock);
 }

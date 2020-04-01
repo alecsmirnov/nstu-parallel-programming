@@ -17,16 +17,8 @@ struct MyMPICommon {
 } mpi_common;
 
 typedef struct MyMPIDataHeader {
-    int rank;
+    int src;
     int tag;
-
-    size_t count;
-    size_t datatype;
 } MyMPIDataHeader;
-
-typedef struct MyMPIData {
-    MyMPIDataHeader header;
-    void* data;
-} MyMPIData;
 
 #endif

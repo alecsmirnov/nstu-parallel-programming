@@ -5,7 +5,6 @@
 #include "mympi.h"
 
 int main(int argc, char* argv[]) {
-
     int rank;
     int num_procs;
 
@@ -14,7 +13,7 @@ int main(int argc, char* argv[]) {
     myMPICommRank(&rank);
     myMPICommSize(&num_procs);
 
-    printf("[%d] of %d\n", rank, num_procs);
+    //printf("%d of %d\n", rank, num_procs);
 
     size_t data_size = 12;
     char* data = (char*)malloc(sizeof(char)* data_size);
@@ -23,9 +22,14 @@ int main(int argc, char* argv[]) {
         strcpy(data, "hello proc0");
 
         myMPISend((void*)data, data_size, sizeof(char), 2, 0);
+        myMPISend((void*)data, data_size, sizeof(char), 1, 0);
     }
 
     if (rank == 1) {
+        myMPIRecv((void*)data, data_size, sizeof(char), 0, 0);
+
+        printf("Process[%d]: %s\n", rank, data);
+
         strcpy(data, "hello proc1");
 
         myMPISend((void*)data, data_size, sizeof(char), 2, 0);
@@ -37,7 +41,9 @@ int main(int argc, char* argv[]) {
         printf("Process[%d]: %s\n", rank, data);
     }
 
-    myMPIFinalize();
+    free(data);
+    
+    //myMPIFinalize();
 
     return 0;
 }
