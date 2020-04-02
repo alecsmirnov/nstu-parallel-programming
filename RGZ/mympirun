@@ -1,48 +1,45 @@
 #!/bin/bash
 
-HOSTNAME="$1"
-PORT="$2"
-PROGNAME="$3"
-PROCS_COUNT="$4"
+HOSTNAME="localhost"
+PORT=8080
+SIZE=1
 
-CORRECT=0
-NO_ARG_ERR=1
-FILE_TYPE_ERR=2
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
 
-function inputCheckStatus {
-    local status=$CORRECT;
-
-    if [ -z "$HOSTNAME" ] || [ -z "$PORT" ] || [ -z "$PROGNAME" ] || [ -z "$PROCS_COUNT" ]; then
-        status=$NO_ARG_ERR
-    else
-        if [ ! -x "$PROGNAME" ]; then
-            status=$FILE_TYPE_ERR
-        fi
-    fi
-
-    echo "$status"
-}
-
-function printErrorByStatus {
-    err_code="$1"
-
-    >&2 echo -n "Error: "
-    case $err_code in 
-        $NO_ARG_ERR) >&2 echo "arguments not specified!";;
-        $FILE_TYPE_ERR) >&2 echo "the file is not executable!";;
+    case $key in
+        -h|-host)
+            HOSTNAME="$2"
+            shift 2
+        ;;
+        -p|-port)
+            PORT="$2"
+            shift 2
+        ;;
+        -n|-np)
+            SIZE="$2"
+            shift 2
+        ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+        ;;
     esac
-}
+done
+set -- "${POSITIONAL[@]}"
 
-function execProcesses {
-    for (( rank=0; rank < PROCS_COUNT; ++rank )); do
-        ./$PROGNAME $HOSTNAME $PORT $rank $PROCS_COUNT &
+if [ -z $1 ]; then
+    echo -e "mympirun a.out\n"
+    echo "Arguments:"
+    echo "-h <host>"
+    echo "    - Name of host on which to run processes"
+    echo "-p <port>"
+    echo "    - Port on which to run processes"
+    echo "-n <np>"
+    echo "    - Specify the number of processes to use"
+else
+    for (( i=0; i < $SIZE; ++i )); do
+        ./$1 $HOSTNAME $PORT $i $SIZE &
     done  
-}
-
-input_status=$(inputCheckStatus)
-
-if [ "$input_status" -eq "$CORRECT" ]; then
-    execProcesses
-else 
-    $(printErrorByStatus "$input_status")
 fi
