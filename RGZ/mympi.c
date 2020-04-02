@@ -1,27 +1,59 @@
 #include "mympi.h"
 
 #include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h> 
 #include <sys/socket.h>
 #include <netdb.h>
 
-#include <fcntl.h>
-#include <errno.h>
+/* ARGS */
+#define ARGS_COUNT 5
 
-#define MPI_ARGS_COUNT 5
+#define ARG_HOST 1
+#define ARG_PORT 2
+#define ARG_RANK 3
+#define ARG_SIZE 4
 
-#define DEFAULT_CLIENT_COUNT 128
+/* Server */
+#define CLIENT_COUNT 128
 
 #define SOCK_ERR -1
 #define SOCK_PASS 0
+
+/* myMPI */
+#define ROOT_RANK 0
 
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
     exit(EXIT_FAILURE);             \
 } while (0)
+
+enum DataType {
+    DT_MSG,
+    DT_BLOCK
+};
+
+typedef struct DataHeader {
+    int src;
+    int tag;
+
+    uint8_t data_type;
+} DataHeader;
+
+struct MyMPIData {
+    struct sockaddr_in serv_addr;
+    int serv_sock;
+
+    int block_size;
+};
+
+struct MyMPIComm {
+    const char* hostname;
+    uint16_t port;
+
+    int rank;
+    int size;
+};
 
 static void dataSend(int sock, void* data, size_t data_size) {
     const char* data_ptr = (const char*)data;
@@ -51,172 +83,163 @@ static void dataRecv(int sock, void* data, size_t data_size) {
     }
 }
 
-static void addBlock() {
-    ++mpi_common.block_size;
-}
-
-static void clearBlockSize() {
-    mpi_common.block_size = 0;
-}
-
-void myMPIInit(int* argc, char** argv[]) {
-    if (*argc < MPI_ARGS_COUNT) 
-        throwErr("Wrong number of arguments!\n"
-                 "Enter: <hostname> <port> <rank> <number of processes>\n");
-
-    int err = 0;
-
-    mpi_common.hostname = (*argv)[1];
-    mpi_common.port = atoi((*argv)[2]);
-    mpi_common.rank = atoi((*argv)[3]);
-    mpi_common.size = atoi((*argv)[4]);
-
-    mpi_common.serv_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (mpi_common.serv_sock == SOCK_ERR)
-		throwErr("Error: serv socket open!"); 
-
- 	char opt = 1;
-	setsockopt(mpi_common.serv_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
-
-    struct hostent* hosten = gethostbyname(mpi_common.hostname); 
-
-	mpi_common.serv_addr.sin_family = AF_INET;
-	mpi_common.serv_addr.sin_addr.s_addr = ((struct in_addr*)hosten->h_addr_list[0])->s_addr;
-	mpi_common.serv_addr.sin_port = htons(mpi_common.port + mpi_common.rank);
-
-	err = bind(mpi_common.serv_sock, (struct sockaddr*)&mpi_common.serv_addr, sizeof(mpi_common.serv_addr));
- 	if (err == SOCK_ERR)
-		throwErr("Error: bind serv socket!");
-	
-	err = listen(mpi_common.serv_sock, DEFAULT_CLIENT_COUNT); 
- 	if (err == SOCK_ERR)
-		throwErr("Error: listen serv socket!");
-
-    clearBlockSize();
-}
-
-static void sendBlockStatus(int dest) {
+static void blockSend(int dest) {
     int send_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sock == SOCK_ERR) 
-    	throwErr("Error: barrier send socket open!"); 
+        throwErr("Error: barrier send socket open!"); 
 
-    int rank;
-    myMPICommRank(&rank);
-
-    struct sockaddr_in send_addr = mpi_common.serv_addr;    
-    send_addr.sin_port = htons(mpi_common.port + dest);
+    struct sockaddr_in send_addr = mympi_data->serv_addr;    
+    send_addr.sin_port = htons(mympi_comm->port + dest);
 
     while (connect(send_sock, (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
 
-    MyMPIDataHeader data_header = (MyMPIDataHeader){rank, -1, MMT_BLOCK};
-    dataSend(send_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
+    DataHeader data_header = (DataHeader){-1, -1, DT_BLOCK};
+    dataSend(send_sock, (void*)&data_header, sizeof(DataHeader));
 
     close(send_sock);
 }
 
-static void recvBlockStatus() {
-    struct sockaddr_in recv_addr;
-    socklen_t recv_len = sizeof(recv_addr);
+static void blockRecv() {
+    DataHeader data_header;
 
-    int recv_sock = accept(mpi_common.serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
-    
-    MyMPIDataHeader data_header;
-    
+    int recv_sock = 0;
     do {
-        dataRecv(recv_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
-    } while (data_header.msg_type != MMT_BLOCK);
+        struct sockaddr_in recv_addr;
+        socklen_t recv_len = sizeof(recv_addr);
+
+        recv_sock = accept(mympi_data->serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
+        if (recv_sock == SOCK_ERR)
+            throwErr("Error: comm recv accept!");
+
+        dataRecv(recv_sock, (void*)&data_header, sizeof(DataHeader));
+    } while (data_header.data_type != DT_BLOCK);
 
     close(recv_sock);
 }
 
+static void blockAdd() {
+    ++mympi_data->block_size;
+}
+
+static void blockClear() {
+    mympi_data->block_size = 0;
+}
+
+void myMPIInit(int* argc, char** argv[]) {
+    if (*argc < ARGS_COUNT) 
+        throwErr("Wrong number of arguments!\n"
+                 "Enter: <hostname> <port> <rank> <number of processes>\n");
+
+    mympi_data = (struct MyMPIData*)malloc(sizeof(struct MyMPIData));
+    mympi_comm = (struct MyMPIComm*)malloc(sizeof(struct MyMPIComm));
+
+    mympi_comm->hostname = (*argv)[ARG_HOST];
+    mympi_comm->port = atoi((*argv)[ARG_PORT]);
+    mympi_comm->rank = atoi((*argv)[ARG_RANK]);
+    mympi_comm->size = atoi((*argv)[ARG_SIZE]);
+
+    mympi_data->block_size = 0;
+
+    mympi_data->serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (mympi_data->serv_sock == SOCK_ERR)
+        throwErr("Error: serv socket open!"); 
+
+    struct hostent* hosten = gethostbyname(mympi_comm->hostname); 
+
+    mympi_data->serv_addr.sin_family = AF_INET;
+    mympi_data->serv_addr.sin_addr.s_addr = ((struct in_addr*)hosten->h_addr_list[0])->s_addr;
+    mympi_data->serv_addr.sin_port = htons(mympi_comm->port + mympi_comm->rank);
+
+    int err = 0;
+    err = bind(mympi_data->serv_sock, (struct sockaddr*)&mympi_data->serv_addr, sizeof(mympi_data->serv_addr));
+    if (err == SOCK_ERR)
+        throwErr("Error: bind serv socket!");
+
+    err = listen(mympi_data->serv_sock, CLIENT_COUNT); 
+    if (err == SOCK_ERR)
+        throwErr("Error: listen serv socket!");
+}
+
 void myMPIBarrier() {
-    int rank;
-    int size;
-
-    myMPICommRank(&rank);
-    myMPICommSize(&size);
-
-    if (rank == ROOT) {
-        while (mpi_common.block_size < size - 1) {
-            recvBlockStatus();
-            addBlock();
+    if (mympi_comm->rank == ROOT_RANK) {
+        while (mympi_data->block_size < mympi_comm->size - 1) {
+            blockRecv();
+            blockAdd();
         }
         
-        for (int i = 0; i != size; ++i)
-            if (i != ROOT)
-                sendBlockStatus(i);
+        for (int dest = 0; dest < mympi_comm->size; ++dest)
+            if (dest != ROOT_RANK)
+                blockSend(dest);
 
-        clearBlockSize();
+        blockClear();
     }
     else {
-        sendBlockStatus(ROOT);
-        recvBlockStatus();
+        blockSend(ROOT_RANK);
+        blockRecv();
     }
 }
 
 void myMPIFinalize() {
     myMPIBarrier();
 
-    close(mpi_common.serv_sock);
+    close(mympi_data->serv_sock);
+
+    free(mympi_data);
+    free(mympi_comm);
 }
 
 void myMPICommRank(int* rank) {
     if (rank == NULL) 
         throwErr("Error: rank null ptr!"); 
 
-    *rank = mpi_common.rank;
+    *rank = mympi_comm->rank;
 }
 
 void myMPICommSize(int* size) {
     if (size == NULL)
         throwErr("Error: size null ptr!"); 
 
-    *size = mpi_common.size;
+    *size = mympi_comm->size;
 }
 
 void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
-    int err = 0;
-
     int send_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sock == SOCK_ERR) 
-    	throwErr("Error: send socket open!"); 
+        throwErr("Error: send socket open!"); 
 
-    struct sockaddr_in send_addr = mpi_common.serv_addr;    
-    send_addr.sin_port = htons(mpi_common.port + dest);
+    struct sockaddr_in send_addr = mympi_data->serv_addr;    
+    send_addr.sin_port = htons(mympi_comm->port + dest);
 
     while (connect(send_sock, (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
 
-    int src = 0;
-    myMPICommRank(&src);
-    MyMPIDataHeader data_header = (MyMPIDataHeader){src, tag, MMT_MSG};
+    DataHeader data_header = (DataHeader){mympi_comm->rank, tag, DT_MSG};
 
-    dataSend(send_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
+    dataSend(send_sock, (void*)&data_header, sizeof(DataHeader));
     dataSend(send_sock, data, count * datatype);
 
     close(send_sock);
 }
 
 void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
-    struct sockaddr_in recv_addr;
-    socklen_t recv_len = sizeof(recv_addr);
-
-    MyMPIDataHeader data_header;
-    void* recv_data = malloc(count * datatype);
+    DataHeader data_header;
 
     int recv_sock = 0;
     do {
-        recv_sock = accept(mpi_common.serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
+        struct sockaddr_in recv_addr;
+        socklen_t recv_len = sizeof(recv_addr);
 
-        dataRecv(recv_sock, (void*)&data_header, sizeof(MyMPIDataHeader));
+        recv_sock = accept(mympi_data->serv_sock, (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
+        if (recv_sock == SOCK_ERR) 
+            throwErr("Error: mpi recv accept!"); 
 
-        if (data_header.msg_type == MMT_MSG)
-            dataRecv(recv_sock, recv_data, count * datatype);
-        else
-            addBlock();
+        dataRecv(recv_sock, (void*)&data_header, sizeof(DataHeader));
+
+        switch (data_header.data_type) {
+            case DT_MSG:   dataRecv(recv_sock, data, count * datatype); break;
+            case DT_BLOCK: blockAdd();                                  break;
+            default:       throwErr("Error: unrecognized data type!");
+        }
     } while (data_header.src != src || data_header.tag != tag);
-
-    memcpy(data, recv_data, count * datatype);
-    free(recv_data);
 
     close(recv_sock);
 }

@@ -1,7 +1,10 @@
 #ifndef MYMPI_H
 #define MYMPI_H
 
-#include "mympicommon.h"
+#include <stddef.h>
+
+struct MyMPIData* mympi_data;
+struct MyMPIComm* mympi_comm;
 
 void myMPIInit(int* argc, char** argv[]);
 void myMPIBarrier();
