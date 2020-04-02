@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+/* myMPI данные (данные одного процесса) */
 struct MyMPIData* mympi_data;
 struct MyMPIComm* mympi_comm;
 

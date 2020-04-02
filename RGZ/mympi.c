@@ -15,49 +15,56 @@
 #define ARG_SIZE 4
 
 /* Server */
-#define CLIENT_COUNT 128
+#define CLIENT_COUNT 128        // Размер очереди подключений
 
-#define SOCK_ERR -1
-#define SOCK_PASS 0
+#define SOCK_ERR -1             // Код ошибки 
+#define SOCK_PASS 0             // Код успеха
 
 /* myMPI */
 #define ROOT_RANK 0
 
+/* Функция отлова ошибок */
 #define throwErr(msg) do {          \
     fprintf(stderr, "%s\n", msg);   \
     exit(EXIT_FAILURE);             \
 } while (0)
 
+/* Тип отправленных/принятых данных */
 enum DataType {
-    DT_MSG,
-    DT_BLOCK
+    DT_MSG,                     // Сообщение
+    DT_BLOCK                    // Блокировка
 };
 
+/* Заголовок отправленных/принятых данных */
 typedef struct DataHeader {
-    int src;
+    int src;                    // Номер процесса отправителя
     int tag;
 
-    uint8_t data_type;
+    uint8_t data_type;          // Тип данных
 } DataHeader;
 
+/* Данные серверной части процесса */
 struct MyMPIData {
-    struct sockaddr_in serv_addr;
+    struct sockaddr_in serv_addr; 
     int serv_sock;
 
-    int block_size;
-};
+    int block_size;             // ROOT_RANK данные:
+};                              // количество блокировок
 
+/* Данные процесса */
 struct MyMPIComm {
-    const char* hostname;
-    uint16_t port;
+    const char* hostname;       // Адрес
+    uint16_t port;              // Порт
 
-    int rank;
-    int size;
+    int rank;                   // Номер процесса
+    int size;                   // Кол-во процессов
 };
 
+/* Отправка данных на сокет */
 static void dataSend(int sock, void* data, size_t data_size) {
     const char* data_ptr = (const char*)data;
 
+    // Проверка данных на целостность
     size_t send_size = 0;
     while (send_size < data_size) {
         int bytes_send = send(sock, data_ptr, data_size, 0);
@@ -69,9 +76,11 @@ static void dataSend(int sock, void* data, size_t data_size) {
     }
 }
 
+/* Приём данных на сокет */
 static void dataRecv(int sock, void* data, size_t data_size) {
     char* data_ptr = (char*)data;
 
+    // Проверка данных на целостность
     size_t recv_size = 0;
     while (recv_size < data_size) {
         int bytes_recv = recv(sock, data_ptr, data_size, 0);
@@ -83,6 +92,7 @@ static void dataRecv(int sock, void* data, size_t data_size) {
     }
 }
 
+/* Отправка статуса блокировки указанному процессу */
 static void blockSend(int dest) {
     int send_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sock == SOCK_ERR) 
@@ -93,15 +103,18 @@ static void blockSend(int dest) {
 
     while (connect(send_sock, (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
 
+    // Посылаем блокирующее сообщение
     DataHeader data_header = (DataHeader){-1, -1, DT_BLOCK};
     dataSend(send_sock, (void*)&data_header, sizeof(DataHeader));
 
     close(send_sock);
 }
 
+/* Приём блокировок от других процессов */
 static void blockRecv() {
     DataHeader data_header;
 
+    // Принимаем данные, пока не поступит блокирующее сообщение
     int recv_sock = 0;
     do {
         struct sockaddr_in recv_addr;
@@ -117,27 +130,36 @@ static void blockRecv() {
     close(recv_sock);
 }
 
+/* Добавить блокировку (увеличить общее количество блокировок) */
 static void blockAdd() {
     ++mympi_data->block_size;
 }
 
+/* Очистить блокировки */
 static void blockClear() {
     mympi_data->block_size = 0;
 }
 
+/* Инициализация работы myMPI */
 void myMPIInit(int* argc, char** argv[]) {
     if (*argc < ARGS_COUNT) 
         throwErr("Wrong number of arguments!\n"
                  "Enter: <hostname> <port> <rank> <number of processes>\n");
 
     mympi_data = (struct MyMPIData*)malloc(sizeof(struct MyMPIData));
+    if (mympi_data == NULL)
+        throwErr("Error: mympi_data out of memmory!");
     mympi_comm = (struct MyMPIComm*)malloc(sizeof(struct MyMPIComm));
+    if (mympi_comm == NULL)
+        throwErr("Error: mympi_comm out of memmory!");
 
+    // Инициализация данных процесса
     mympi_comm->hostname = (*argv)[ARG_HOST];
     mympi_comm->port = atoi((*argv)[ARG_PORT]);
     mympi_comm->rank = atoi((*argv)[ARG_RANK]);
     mympi_comm->size = atoi((*argv)[ARG_SIZE]);
 
+    // Инициализация данных серверной части
     mympi_data->block_size = 0;
 
     mympi_data->serv_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -160,25 +182,35 @@ void myMPIInit(int* argc, char** argv[]) {
         throwErr("Error: listen serv socket!");
 }
 
+/* Барьерная синхронизация потоков */
 void myMPIBarrier() {
+    // Если поток основной
     if (mympi_comm->rank == ROOT_RANK) {
+        // Принимаем блокировки от других потоков,
+        // пока все, другие потоки, не будут заблокированы
         while (mympi_data->block_size < mympi_comm->size - 1) {
             blockRecv();
             blockAdd();
         }
         
+        // Когда все потоки заблокированы -- разблокируем их
         for (int dest = 0; dest < mympi_comm->size; ++dest)
             if (dest != ROOT_RANK)
                 blockSend(dest);
-
-        blockClear();
     }
     else {
+        // Если поток не основной --
+        // посылаем сообщение о блокировке основному потоку 
         blockSend(ROOT_RANK);
+        // Ждём сигнал для разблокировки от основного потока
         blockRecv();
     }
+
+    // Очищаем блокировки
+    blockClear();
 }
 
+/* Завершение работы myMPI */
 void myMPIFinalize() {
     myMPIBarrier();
 
@@ -188,6 +220,7 @@ void myMPIFinalize() {
     free(mympi_comm);
 }
 
+/* Получить номер процесса */
 void myMPICommRank(int* rank) {
     if (rank == NULL) 
         throwErr("Error: rank null ptr!"); 
@@ -195,6 +228,7 @@ void myMPICommRank(int* rank) {
     *rank = mympi_comm->rank;
 }
 
+/* Получить общее число процессов */
 void myMPICommSize(int* size) {
     if (size == NULL)
         throwErr("Error: size null ptr!"); 
@@ -202,6 +236,7 @@ void myMPICommSize(int* size) {
     *size = mympi_comm->size;
 }
 
+/* Отправка данных процессу */
 void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
     int send_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (send_sock == SOCK_ERR) 
@@ -220,9 +255,11 @@ void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
     close(send_sock);
 }
 
+/* Приём данных процесса */
 void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
     DataHeader data_header;
 
+    // Ожидаем сообщение, пока номер и тэг сообщения не соответствует указанным
     int recv_sock = 0;
     do {
         struct sockaddr_in recv_addr;
@@ -234,6 +271,7 @@ void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
 
         dataRecv(recv_sock, (void*)&data_header, sizeof(DataHeader));
 
+        // Проверяем тип сообщения. Если получена блокировка -- запоминаем её, для будущей проверки
         switch (data_header.data_type) {
             case DT_MSG:   dataRecv(recv_sock, data, count * datatype); break;
             case DT_BLOCK: blockAdd();                                  break;
