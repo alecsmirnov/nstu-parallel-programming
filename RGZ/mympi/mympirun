@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ROOT_RANK=0
+
 HOSTNAME="localhost"
 PORT=8080
 SIZE=1
@@ -39,7 +41,9 @@ if [ -z $1 ]; then
     echo "-n <np>"
     echo "    - Specify the number of processes to use"
 else
-    for (( i=0; i < $SIZE; ++i )); do
+    for (( i=1; i < $SIZE; ++i )); do
         ./$1 $HOSTNAME $PORT $i $SIZE &
-    done  
+    done
+
+    ./$1 $HOSTNAME $PORT $ROOT_RANK $SIZE
 fi

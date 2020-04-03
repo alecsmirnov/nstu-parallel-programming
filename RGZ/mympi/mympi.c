@@ -15,6 +15,8 @@
 #define ARG_SIZE 4
 
 /* Server */
+#define EMIT_SIZE 1024
+
 #define CLIENT_COUNT 128        // Размер очереди подключений
 
 #define SOCK_ERR -1             // Код ошибки 
@@ -63,13 +65,13 @@ struct MyMPIComm {
 /* Отправка данных на сокет */
 static void dataSend(int sock, void* data, size_t data_size) {
     const char* data_ptr = (const char*)data;
-
+    
     // Проверка данных на целостность
     size_t send_size = 0;
     while (send_size < data_size) {
         int bytes_send = send(sock, data_ptr, data_size, 0);
         if (bytes_send == SOCK_ERR)
-            throwErr("Error: send data header to dest!"); 
+            throwErr("Error: send data to dest!"); 
 
         data_ptr += bytes_send;
         send_size += bytes_send;
@@ -90,6 +92,38 @@ static void dataRecv(int sock, void* data, size_t data_size) {
         data_ptr += bytes_recv;
         recv_size += bytes_recv;
     }
+}
+
+/* Отправка больших данных на сокет */
+static void largeDataSend(int sock, void* data, size_t data_size) {
+    char* data_ptr = (char*)data;
+
+    if (EMIT_SIZE < data_size) {
+        size_t i;
+        for (i = 0; i < data_size; i += EMIT_SIZE)
+            dataSend(sock, data_ptr + i, EMIT_SIZE);
+
+        data_ptr = data_ptr + i;
+        data_size = data_size % EMIT_SIZE;;
+    }
+
+    dataSend(sock, data_ptr, data_size);
+}
+
+/* Приём больших данных на сокет */
+static void largeDataRecv(int sock, void* data, size_t data_size) {
+    char* data_ptr = (char*)data;
+
+    if (EMIT_SIZE < data_size) {
+        size_t i;
+        for (i = 0; i < data_size; i += EMIT_SIZE)
+            dataRecv(sock, data_ptr + i, EMIT_SIZE);
+
+        data_ptr = data_ptr + i;
+        data_size = data_size % EMIT_SIZE;;
+    }
+
+    dataRecv(sock, data_ptr, data_size);
 }
 
 /* Отправка статуса блокировки указанному процессу */
@@ -250,7 +284,7 @@ void myMPISend(void* data, size_t count, size_t datatype, int dest, int tag) {
     DataHeader data_header = (DataHeader){mympi_comm->rank, tag, DT_MSG};
 
     dataSend(send_sock, (void*)&data_header, sizeof(DataHeader));
-    dataSend(send_sock, data, count * datatype);
+    largeDataSend(send_sock, data, count * datatype);
 
     close(send_sock);
 }
@@ -271,12 +305,34 @@ void myMPIRecv(void* data, size_t count, size_t datatype, int src, int tag) {
 
         dataRecv(recv_sock, (void*)&data_header, sizeof(DataHeader));
 
+        switch (data_header.data_type) {
+            case DT_MSG: {
+                largeDataRecv(recv_sock, data, count * datatype); 
+                /*
+                if (data_header.src != src || data_header.tag != tag) {
+                    dataSend(mympi_data->serv_sock, (void*)&data_header, sizeof(DataHeader));
+                    largeDataSend(mympi_data->serv_sock, data, count * datatype);
+                }
+                */
+                break;
+            }
+            case DT_BLOCK: {
+                blockAdd(); 
+                break;
+            }
+            default: {
+                throwErr("Error: unrecognized data type!");
+            }
+        }
+
+        /*
         // Проверяем тип сообщения. Если получена блокировка -- запоминаем её, для будущей проверки
         switch (data_header.data_type) {
-            case DT_MSG:   dataRecv(recv_sock, data, count * datatype); break;
-            case DT_BLOCK: blockAdd();                                  break;
+            case DT_MSG:   largeDataRecv(recv_sock, data, count * datatype); break;
+            case DT_BLOCK: blockAdd();                                       break;
             default:       throwErr("Error: unrecognized data type!");
         }
+        */
     } while (data_header.src != src || data_header.tag != tag);
 
     close(recv_sock);
