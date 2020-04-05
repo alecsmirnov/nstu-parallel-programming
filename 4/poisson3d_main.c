@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
 
     P3DResult res = solveEquation(&grid);
 
-    printf("Result: %lf\n", res.result);
+    printf("Result: %.15lf\n", res.result);
     printf("Iters:  %zu\n", res.iters);
 
     free(grid.data);
