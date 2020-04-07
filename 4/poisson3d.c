@@ -236,29 +236,6 @@ static double processBorders(int rank, int size, double* data, double* new_data,
     return result;
 }
 
-// Обмен результатами между процессам (поиск max)
-static void resultsExchange(int rank, int size, double* result) {
-    MPI_Status status;
-
-    // Глвный процесс принимает результаты других процессов
-    if (rank == ROOT_RANK) {
-        for (int i = 1; i != size; ++i) {
-            double rank_result = 0;
-            MPI_Recv(&rank_result, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &status);
-
-            *result = max(*result, rank_result);
-        }
-
-        // Посылаем max другим процессам
-        for (int i = 1; i != size; ++i)
-            MPI_Send(result, 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
-    }
-    else {
-        MPI_Send(result, 1, MPI_DOUBLE, ROOT_RANK, 0, MPI_COMM_WORLD);
-        MPI_Recv(result, 1, MPI_DOUBLE, ROOT_RANK, 0, MPI_COMM_WORLD, &status);
-    }
-}
-
 // Параллельное решение уравнения
 static void parallelSolution(Point D, Point N, DPoint p0, int rank, int size, P3DResult* result) {
     P3DResult root_result;
@@ -297,16 +274,16 @@ static void parallelSolution(Point D, Point N, DPoint p0, int rank, int size, P3
     for (int i = 0; i != size; ++i) {
         local_sizes[i] = chunk_size + (i < remainder ? 1 : 0);
 
-        offsets[i] = shift;
+        offsets[i] = shift;                         // Сдвиг строки локальных данных
         shift += local_sizes[i];
 
-        local_sizes[i] *= block_size;
-        offsets[i] *= block_size;
+        local_sizes[i] *= block_size;               // Получение размера локального блока
+        offsets[i] *= block_size;                   // Получение сдвига блока данных
     }
 
     // Определение границ и сдвигов границ
-    int borders = 2 * block_size;
-    int borders_offset = block_size;
+    int borders = 2 * block_size;                   // Кол-во границ
+    int borders_offset = block_size;                // Сдвиг границ
 
     if (rank == 0 || rank == size - 1) {
         borders = block_size;
@@ -319,7 +296,7 @@ static void parallelSolution(Point D, Point N, DPoint p0, int rank, int size, P3
     if (local_data == NULL)
         throwErr("Error: local data out of memmory!");
 
-    // Разбиваем поле данны на блоки разного размера и посылаем другим процессам
+    // Разбиение поля данных на блоки разного размера и передача другим процессам
     MPI_Scatterv(grid_data, local_sizes, offsets, MPI_DOUBLE, local_data + borders_offset, 
                  local_sizes[rank], MPI_DOUBLE, ROOT_RANK, MPI_COMM_WORLD);
 
@@ -358,7 +335,7 @@ static void parallelSolution(Point D, Point N, DPoint p0, int rank, int size, P3
                        D, h, p0, jacobi_result);
 
         // Обмениваемся результатми между процессами и находи max
-        resultsExchange(rank, size, &jacobi_result);
+        MPI_Allreduce(MPI_IN_PLACE, &jacobi_result, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
         memcpy(local_data, new_data, sizeof(double) * (local_sizes[rank] + borders));
         
