@@ -3,10 +3,14 @@
 
 #include <stdlib.h>
 
-#define ALPHA 10E+5
-#define EPS   10E-8
+#ifdef WITH_MPI
+#include <mpi.h>
+#endif
 
-#define ITERS_MAX 100
+#define ALPHA 10E+5         // Параметр уравнения
+#define EPS   10E-8         // Порог сходимости
+
+#define ITERS_MAX 1000      // Кол-во итераций метода
 
 typedef struct Point {
     size_t x;
@@ -20,22 +24,10 @@ typedef struct DPoint {
     double z;
 } DPoint;
 
-typedef struct Grid {
-    double* data;
-
-    Point D;
-    Point N;
-
-    DPoint h;
-    DPoint p0;
-} Grid;
-
 typedef struct P3DResult {
     double result;
     size_t iters;
 } P3DResult;
-
-void gridInit(Grid* grid, Point D, Point N, DPoint p0);
 
 void solveEquation(Point D, Point N, DPoint p0, P3DResult* result);
 
