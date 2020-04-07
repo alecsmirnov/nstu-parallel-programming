@@ -37,6 +37,6 @@ typedef struct P3DResult {
 
 void gridInit(Grid* grid, Point D, Point N, DPoint p0);
 
-P3DResult solveEquation(Grid* grid);
+void solveEquation(Point D, Point N, DPoint p0, P3DResult* result);
 
 #endif
