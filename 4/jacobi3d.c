@@ -1,4 +1,4 @@
-#include "poisson3d.h"
+#include "jacobi3d.h"
 
 #include <stdio.h>
 #include <stdbool.h>

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "poisson3d.h"
+#include "jacobi3d.h"
 
 #define ARGS_COUNT 10
 

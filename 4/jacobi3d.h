@@ -1,5 +1,5 @@
-#ifndef POISSON3D_H
-#define POISSON3D_H
+#ifndef JACOBI3D_H
+#define JACOBI3D_H
 
 #include <stdlib.h>
 
