@@ -60,31 +60,7 @@ static void matVecMult(double* res, double* mat, double* vec, size_t n, size_t m
 }
 
 int main(int argc, char* argv[]) {
-    //if (argc < ARGS_COUNT) 
-    //    throwErr("Wrong number of arguments!\nEnter: <n> <m>\n");
-
     srand(time(NULL));
-
-    // Размер задачи
-    //size_t root_n = atoi(argv[1]);
-    //size_t root_m = atoi(argv[1]);
-    size_t root_n = 10000;
-    size_t root_m = 1000;
-
-    // Исходная матрица
-    double* root_mat = NULL;
-
-    // Размер обрабатываемого блока процессом
-    size_t n = 0;
-    size_t m = root_m;
-
-    // Данные процессов:
-    // Часть исходной матрицы (Исходня матрица для ROOT_RANK)
-    double* mat = NULL;
-    // Исходный вектор
-    double* vec = NULL;
-    // Часть результата (Конечный результат для ROOT_RANK)
-    double* res = NULL;
 
     int rank = 0;
     int size = 1;
@@ -102,6 +78,40 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);  
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     #endif
+
+    // Проверка входных аргументон
+    if (argc < ARGS_COUNT) {
+        if (rank == ROOT_RANK) {
+            fprintf(stderr, "Wrong number of arguments!\n");
+            fprintf(stderr, "Enter: <n> <m>\n");
+        }
+
+        #ifdef MYMPI
+        myMPIFinalize();
+        #else
+        MPI_Finalize();
+        #endif
+        exit(EXIT_FAILURE);
+    }
+
+    // Размер задачи
+    size_t root_n = atoi(argv[1]);
+    size_t root_m = atoi(argv[2]);
+
+    // Исходная матрица
+    double* root_mat = NULL;
+
+    // Размер обрабатываемого блока процессом
+    size_t n = 0;
+    size_t m = root_m;
+
+    // Данные процессов:
+    // Часть исходной матрицы (Исходня матрица для ROOT_RANK)
+    double* mat = NULL;
+    // Исходный вектор
+    double* vec = NULL;
+    // Часть результата (Конечный результат для ROOT_RANK)
+    double* res = NULL;
 
     // Генерация данных (матрица m * n, вектор m)
     if (rank == ROOT_RANK) {
@@ -126,7 +136,7 @@ int main(int argc, char* argv[]) {
         // Если процесс главный --
         // Отправить вектор и его размер другим процессам 
         for (uint8_t i = 1; i < size; ++i) {
-            #ifdef MYMPI
+             #ifdef MYMPI
             myMPISend(&root_m, 1, sizeof(size_t), i, 0);
             myMPISend(vec, root_m, sizeof(double), i, 0);
             #else

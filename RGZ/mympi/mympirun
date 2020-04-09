@@ -42,8 +42,8 @@ if [ -z $1 ]; then
     echo "    - Specify the number of processes to use"
 else
     for (( i=1; i < $SIZE; ++i )); do
-        ./$1 $HOSTNAME $PORT $i $SIZE &
+        ./$1 $HOSTNAME $PORT $i $SIZE "${@:2}" &
     done
 
-    ./$1 $HOSTNAME $PORT $ROOT_RANK $SIZE
+    ./$1 $HOSTNAME $PORT $ROOT_RANK $SIZE "${@:2}"
 fi

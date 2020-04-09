@@ -5,18 +5,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netdb.h>
 
 /* ARGS */
 #define ARGS_COUNT 5
 
-#define ARG_HOST 1
-#define ARG_PORT 2
-#define ARG_RANK 3
-#define ARG_SIZE 4
-
 /* Server */
-#define EMIT_SIZE 10000
+#define EMIT_SIZE 100000
 
 #define CLIENT_COUNT 128        // Размер очереди подключений
 
@@ -83,6 +79,11 @@ static void dataSend(int sock, void* data, size_t data_size) {
 static void dataRecv(int sock, void* data, size_t data_size) {
     char* data_ptr = (char*)data;
 
+    int sock_data = 0;
+    do {
+        ioctl(sock, FIONREAD, &sock_data);
+    } while (sock_data < data_size);
+
     // Проверка данных на целостность
     size_t recv_size = 0;
     while (recv_size < data_size) {
@@ -101,7 +102,7 @@ static void largeDataSend(int sock, void* data, size_t data_size) {
 
     if (EMIT_SIZE < data_size) {
         size_t i;
-        for (i = 0; i < data_size; i += EMIT_SIZE)
+        for (i = 0; i < data_size - EMIT_SIZE; i += EMIT_SIZE)
             dataSend(sock, data_ptr + i, EMIT_SIZE);
 
         data_ptr = data_ptr + i;
@@ -117,7 +118,7 @@ static void largeDataRecv(int sock, void* data, size_t data_size) {
 
     if (EMIT_SIZE < data_size) {
         size_t i;
-        for (i = 0; i < data_size; i += EMIT_SIZE)
+        for (i = 0; i < data_size - EMIT_SIZE; i += EMIT_SIZE)
             dataRecv(sock, data_ptr + i, EMIT_SIZE);
 
         data_ptr = data_ptr + i;
@@ -174,14 +175,24 @@ void myMPIInit(int* argc, char** argv[]) {
         throwErr("Error: mympi_comm out of memmory!");
 
     // Инициализация данных процесса
-    mympi_comm->hostname = (*argv)[ARG_HOST];
-    mympi_comm->port = atoi((*argv)[ARG_PORT]);
-    mympi_comm->rank = atoi((*argv)[ARG_RANK]);
-    mympi_comm->size = atoi((*argv)[ARG_SIZE]);
+    mympi_comm->hostname = (*argv)[1];
+    mympi_comm->port = atoi((*argv)[2]);
+    mympi_comm->rank = atoi((*argv)[3]);
+    mympi_comm->size = atoi((*argv)[4]);
+
+    // Очиста myMPI аргументов командой строки (сдвиг аргументов программы на их место)
+    (*argc) -= ARGS_COUNT - 1;
+    for (uint8_t i = 1; i != *argc; ++i)
+        (*argv)[i] = (*argv)[i + ARGS_COUNT - 1];
 
     // Инициализация данных серверной части
     mympi_data->send_socks = (int*)malloc(sizeof(int) * mympi_comm->size);
+    if (mympi_data->send_socks == NULL)
+        throwErr("Error: send socks out of memmory!");
+
     mympi_data->recv_socks = (int*)malloc(sizeof(int) * mympi_comm->size);
+    if (mympi_data->recv_socks == NULL)
+        throwErr("Error: recv socks out of memmory!");
 
     mympi_data->block_size = 0;
 
@@ -202,7 +213,11 @@ void myMPIInit(int* argc, char** argv[]) {
             int err = 0;
             char on = 1;
 
-            err = setsockopt(mympi_data->send_socks[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&on, sizeof(on));
+            err = setsockopt(mympi_data->send_socks[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char*)&on, sizeof(on));
+            if (err == SOCK_ERR)
+                throwErr("Error: setsockopt failed!");
+
+            err = ioctl(mympi_data->send_socks[i], FIONBIO, (char *)&on);
             if (err == SOCK_ERR)
                 throwErr("Error: setsockopt failed!");
 
@@ -216,6 +231,7 @@ void myMPIInit(int* argc, char** argv[]) {
         }
         else {
             while (connect(mympi_data->send_socks[i], (struct sockaddr*)&send_addr, sizeof(send_addr)) != SOCK_PASS);
+
             dataSend(mympi_data->send_socks[i], (void*)&mympi_comm->rank, sizeof(int));
         }
     }
@@ -225,9 +241,17 @@ void myMPIInit(int* argc, char** argv[]) {
         struct sockaddr_in recv_addr;
         socklen_t recv_len = sizeof(recv_addr);
 
-        int recv_sock = accept(mympi_data->send_socks[mympi_comm->rank], (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
-        if (recv_sock == SOCK_ERR) 
-            throwErr("Error: recv sock accept!"); 
+        int recv_sock = 0;
+        do {
+            recv_sock = accept(mympi_data->send_socks[mympi_comm->rank], (struct sockaddr*)&recv_addr, (socklen_t*)&recv_len);
+            if (recv_sock < SOCK_ERR) 
+                throwErr("Error: recv sock accept!"); 
+        } while (recv_sock == SOCK_ERR);
+
+        size_t ready_data = 0;
+        do {
+            ioctl(recv_sock, FIONREAD, &ready_data);
+        } while(ready_data < sizeof(int));
 
         int recv_rank;
         dataRecv(recv_sock, (void*)&recv_rank, sizeof(int));
