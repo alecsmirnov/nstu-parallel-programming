@@ -4,7 +4,7 @@
 #include <time.h>
 
 #ifdef MYMPI
-#include "mympi/mympi.h"
+#include "mympi.h"
 #else 
 #include <mpi.h>
 #endif
@@ -261,7 +261,6 @@ int main(int argc, char* argv[]) {
         #endif
 
         printf("Elapsed time: %lf\n", clocktimeDifference(start, stop));
-
     }
     
     free(mat);
