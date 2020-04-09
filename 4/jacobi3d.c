@@ -337,7 +337,10 @@ static void parallelSolution(Point D, Point N, DPoint p0, int rank, int size, P3
         // Обмениваемся результатми между процессами и находи max
         MPI_Allreduce(MPI_IN_PLACE, &jacobi_result, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-        memcpy(local_data, new_data, sizeof(double) * (local_sizes[rank] + borders));
+        // Обновление сетки для следующей итерации
+        double* tmp = local_data;
+        local_data = new_data;
+        new_data = tmp;
         
         ++iters;
         // Проверка порога сходимости и максимального кол-ва итераций
