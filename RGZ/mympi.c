@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <netdb.h>
@@ -145,14 +146,14 @@ static void sendSocksInit() {
 
         if (i == mympi_comm->rank) {
             int err = 0;
-            char on = 1;
+            int on = 1;
 
-            err = setsockopt(mympi_data->send_socks[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char*)&on, sizeof(on));
+            err = setsockopt(mympi_data->send_socks[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (int*)&on, sizeof(int));
             if (err == SOCK_ERR)
                 throwErr("Error: setsockopt failed!");
 
             // Делаем сокет неблокирующим
-            err = ioctl(mympi_data->send_socks[i], FIONBIO, (char *)&on);
+            err = ioctl(mympi_data->send_socks[i], FIONBIO, (int*)&on);
             if (err == SOCK_ERR)
                 throwErr("Error: setsockopt failed!");
 
