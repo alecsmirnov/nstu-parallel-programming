@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <netdb.h>
 
 /* myMPI */
@@ -14,7 +13,7 @@
 #define ROOT_RANK  0
 
 /* Server */
-#define EMIT_SIZE    100000
+#define EMIT_SIZE    1000
 #define CLIENT_COUNT 128        // Размер очереди подключений
 
 #define SOCK_ERR -1             // Код ошибки 
@@ -59,38 +58,37 @@ struct MyMPIComm {
 
 /* Отправка данных на сокет */
 static void dataSend(int sock, void* data, size_t data_size) {
-    const char* data_ptr = (const char*)data;
-    
-    // Проверка данных на целостность
-    size_t send_size = 0;
-    while (send_size < data_size) {
-        int bytes_send = send(sock, data_ptr, data_size, 0);
-        if (bytes_send == SOCK_ERR)
-            throwErr("Error: send data to dest!"); 
+    if (data_size) {
+        const char* data_ptr = (const char*)data;
+        
+        // Проверка данных на целостность
+        size_t send_size = 0;
+        while (send_size < data_size) {
+            int bytes_send = send(sock, data_ptr, data_size, 0);
+            if (bytes_send == SOCK_ERR)
+                throwErr("Error: send data to dest!"); 
 
-        data_ptr += bytes_send;
-        send_size += bytes_send;
+            data_ptr += bytes_send;
+            send_size += bytes_send;
+        }
     }
 }
 
 /* Приём данных на сокет */
 static void dataRecv(int sock, void* data, size_t data_size) {
-    char* data_ptr = (char*)data;
+    if (data_size) {
+        char* data_ptr = (char*)data;
 
-    int sock_data = 0;
-    do {
-        ioctl(sock, FIONREAD, &sock_data);
-    } while (sock_data < data_size);
+        // Проверка данных на целостность
+        size_t recv_size = 0;
+        while (recv_size < data_size) {
+            int bytes_recv = recv(sock, data_ptr, data_size, 0);
+            if (bytes_recv == SOCK_ERR)
+                throwErr("Error: recv data from src!");
 
-    // Проверка данных на целостность
-    size_t recv_size = 0;
-    while (recv_size < data_size) {
-        int bytes_recv = recv(sock, data_ptr, data_size, 0);
-        if (bytes_recv == SOCK_ERR)
-            throwErr("Error: recv data from src!");
-
-        data_ptr += bytes_recv;
-        recv_size += bytes_recv;
+            data_ptr += bytes_recv;
+            recv_size += bytes_recv;
+        }
     }
 }
 
@@ -149,11 +147,6 @@ static void sendSocksInit() {
             int on = 1;
 
             err = setsockopt(mympi_data->send_socks[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (int*)&on, sizeof(int));
-            if (err == SOCK_ERR)
-                throwErr("Error: setsockopt failed!");
-
-            // Делаем сокет неблокирующим
-            err = ioctl(mympi_data->send_socks[i], FIONBIO, (int*)&on);
             if (err == SOCK_ERR)
                 throwErr("Error: setsockopt failed!");
 
