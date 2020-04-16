@@ -13,7 +13,7 @@
 #define ROOT_RANK  0
 
 /* Server */
-#define EMIT_SIZE    1000
+#define EMIT_SIZE    10000
 #define CLIENT_COUNT 128        // Размер очереди подключений
 
 #define SOCK_ERR -1             // Код ошибки 
@@ -64,7 +64,7 @@ static void dataSend(int sock, void* data, size_t data_size) {
         // Проверка данных на целостность
         size_t send_size = 0;
         while (send_size < data_size) {
-            int bytes_send = send(sock, data_ptr, data_size, 0);
+            int bytes_send = send(sock, data_ptr, data_size - send_size, 0);
             if (bytes_send == SOCK_ERR)
                 throwErr("Error: send data to dest!"); 
 
@@ -82,7 +82,7 @@ static void dataRecv(int sock, void* data, size_t data_size) {
         // Проверка данных на целостность
         size_t recv_size = 0;
         while (recv_size < data_size) {
-            int bytes_recv = recv(sock, data_ptr, data_size, 0);
+            int bytes_recv = recv(sock, data_ptr, data_size - recv_size, 0);
             if (bytes_recv == SOCK_ERR)
                 throwErr("Error: recv data from src!");
 
